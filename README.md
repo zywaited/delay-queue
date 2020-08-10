@@ -49,6 +49,14 @@
 #### Ready-Queue
 Redis List & Kakfa都可以
 
+### 访问
+#### GRPC
+参考：https://github.com/zywaited/delay-queue/blob/master/protocol/pb/protobuf/service.proto
+#### HTTP
+* Add：/task/add
+* Get: /task/get
+* Remove: /task/remove
+
 ## TODO(设计)
 ### 注册
 #### Key
