@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+// model task redis pb
+package pb;
+
+import "define.proto";
+
+message Task {
+    uint32 id = 1;
+    string uid = 2;
+    string name = 3;
+    TaskType type = 4;
+    int32 times = 5;
+    int32 retry_times = 6;
+    int64 exec_time = 7;
+    int64 next_exec_time = 8;
+    string schema = 9;
+    string address = 10;
+    string path = 11;
+    int64 created_at = 12;
+    int64 updated_at = 13;
+}

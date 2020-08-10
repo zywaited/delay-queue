@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package pb;
+
+// 根据文档定义常量
+enum TaskType {
+    Ignore = 0;
+    TaskDelay = 1;
+    TaskReady = 2;
+    TaskReserved = 3;
+    TaskFinished = 4;
+    TaskRetryDelay = 5;
+    TaskCheck = 6;
+}

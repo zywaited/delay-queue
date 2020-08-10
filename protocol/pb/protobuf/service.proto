@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package pb;
+
+import "message.proto";
+import "task.proto";
+import "google/protobuf/empty.proto";
+
+// 服务接入GRPC接口
+service DelayQueue {
+    rpc Add (AddReq) returns (AddResp);
+
+    rpc Get (RetrieveReq) returns (Task);
+
+    rpc Remove (RemoveReq) returns (google.protobuf.Empty);
+}
+
+// 回调客户端GRPC接口
+service Callback {
+    rpc Send (CallBackReq) returns (google.protobuf.Empty);
+}

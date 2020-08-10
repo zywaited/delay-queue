@@ -1,0 +1,70 @@
+# 基础值
+base_level = "second"
+
+# 指针转动时间
+config_scale = 1
+
+# 1: timer; 2: worker
+role = 3
+
+# 存储
+[data_source]
+    dst = "redis"
+    [data_source.redis]
+        # 前缀
+        prefix = "med-delay-queue-store"
+        # 名称
+        name = "task"
+
+# 扫描器
+[timer]
+    st = "timing-wheel-server"
+    config_scale_level = 1
+    max_check_time = 8
+    check_multi = 15
+    timeout = 3
+    [timer.timing_wheel]
+        max_level = 5
+        slot_num = 60
+        reload_go_num = 6
+        reload_config_scale = 1
+        reload_per_num = 50
+
+# 回调器
+[worker]
+    retry_times = 3
+    multi_num = 3
+    timeout = 3
+
+# 日志
+[log]
+    dir = "/var/log/medlinker/med-delay-queue"
+    level = "info"
+    category = "service"
+
+[redis]
+    addr = "127.0.0.1:6379"
+    auth = ""
+    db = 0
+    idle = 100
+    active = 10
+    wait = true
+    connect_timeout = 300
+
+# 监听
+[services]
+    types = ["GRPC", "HTTP"]
+    [services.http]
+        addr = "0.0.0.0:80"
+    [services.grpc]
+        addr = "0.0.0.0:8000"
+
+# 服务唯一标识
+[generate_id]
+    # 生成器类型
+    type = ""
+    timeout = 1000
+    [generate_id.group]
+        id = "1"
+        group = "1-1"
+        num = 1

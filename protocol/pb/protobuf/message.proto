@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package pb;
+
+message ExecTime {
+    // 执行时间戳
+    int64 duration = 1;
+    // 是否是相对时间(如果是相对时间，那么真正执行时间为NOW()+duration)
+    bool relative = 2;
+}
+
+message CallbackInfo {
+    // @inject_tag: valid:"required" 协议(HTTP\GRPC)
+    string schema = 1;
+    // @inject_tag: valid:"required" 地址+端口
+    string address = 2;
+    // 路径(GRPC回调函数固定的)
+    string path = 3;
+}
+
+message AddReq {
+    // @inject_tag: valid:"required" 业务名称(worker回调时会返回)
+    string name = 1;
+    ExecTime time = 2;
+    // @inject_tag: valid:"required" 回调路径
+    CallbackInfo callback = 3;
+}
+
+message AddResp {
+    // @inject_tag: valid:"required" 返回当前唯一标识
+    string uid = 1;
+}
+
+message RetrieveReq {
+    // @inject_tag: valid:"required"
+    string uid = 1;
+}
+
+message RemoveReq {
+    // @inject_tag: valid:"required"
+    string uid = 1;
+}
+
+message CallBackReq {
+    // @inject_tag: valid:"required"
+    string uid = 1;
+    string name = 2;
+    string url = 3;
+}
