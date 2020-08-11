@@ -336,9 +336,9 @@ func (dq *DelayQueue) initTransporters() error {
 	}
 	timeout *= dq.base
 	dq.transports = make(transport.TransporterM)
-	dq.transports[transport.TransporterType(trhttp.SendersType)] = trhttp.NewSender(
-		trhttp.SenderOptionWithTimeout(timeout),
-	)
+	th := trhttp.NewSender(trhttp.SenderOptionWithTimeout(timeout))
+	dq.transports[transport.TransporterType(trhttp.SendersType)] = th
+	dq.transports[transport.TransporterType(trhttp.SenderHttpsType)] = th
 	return nil
 }
 

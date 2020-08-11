@@ -15,7 +15,10 @@ import (
 	"github.com/zywaited/delay-queue/protocol/pb"
 )
 
-const SendersType = "HTTP"
+const (
+	SendersType     = "HTTP"
+	SenderHttpsType = "HTTPS"
+)
 
 type SenderOption func(*Sender)
 
