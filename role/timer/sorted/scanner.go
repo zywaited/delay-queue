@@ -246,3 +246,11 @@ func (s *server) scanTask() {
 		s.c.logger.Infof("task: %v remove error: %s (重复处理)", uids, err.Error())
 	}
 }
+
+func (s *server) Running() bool {
+	return atomic.LoadInt32(&s.status) == role.StatusRunning
+}
+
+func (s *server) Stopped() bool {
+	return atomic.LoadInt32(&s.status) != role.StatusRunning
+}

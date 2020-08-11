@@ -154,7 +154,7 @@ func (tws *TWStore) rangeReady(st, et, offset, limit int64) ([]*model.Task, erro
 		}
 		return nil, errors.WithMessage(err, "redis查询当前分值的任务失败")
 	}
-	return tws.Batch(uids)
+	return tws.batch(c, uids)
 }
 
 func (tws *TWStore) readyNum(st, et int64) (int, error) {

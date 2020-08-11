@@ -77,36 +77,7 @@ func (ms *MapStore) Batch(uids []string) ([]*model.Task, error) {
 	defer func() {
 		_ = c.Close()
 	}()
-	for _, uid := range uids {
-		err := c.Send("HGETALL", fmt.Sprintf("%s_%s", ms.absoluteName, uid))
-		if err != nil {
-			return nil, errors.WithMessage(err, "Redis数据获取失败")
-		}
-	}
-	ts := make([]*model.Task, 0, len(uids))
-	cp := ms.c.cp
-	for range uids {
-		rt, err := redis.StringMap(c.Receive())
-		if err != nil {
-			if err == redis.ErrNil {
-				continue
-			}
-			return nil, errors.WithMessage(err, "Redis数据获取失败")
-		}
-		if len(rt) == 0 {
-			continue
-		}
-		xcopy.WithSource(rt)(cp)
-		t := model.GenerateTask()
-		ts = append(ts, t)
-		if err = cp.CopyF(t); err != nil {
-			for _, t = range ts {
-				model.ReleaseTask(t)
-			}
-			return nil, errors.WithMessage(err, "Redis数据协议转换失败[Batch]")
-		}
-	}
-	return ts, nil
+	return ms.batch(c, uids)
 }
 
 func (ms *MapStore) InsertMany(ts []*model.Task) error {
@@ -126,7 +97,7 @@ func (ms *MapStore) RemoveMany(uids []string) error {
 	defer func() {
 		_ = c.Close()
 	}()
-	err := ms.removeMany(uids, ms.do)
+	err := ms.removeMany(uids, c.Send)
 	if err != nil {
 		return errors.WithMessage(err, "Redis数据批量删除失败")
 	}
@@ -196,13 +167,7 @@ func (ms *MapStore) Status(uid string, tt pb.TaskType) error {
 }
 
 func (ms *MapStore) NextTime(uid string, nt *time.Time) error {
-	c := ms.rp.Get()
-	defer func() {
-		_ = c.Close()
-	}()
-	key := fmt.Sprintf("%s_%s", ms.absoluteName, uid)
-	_, err := c.Do("HSET", key, "next_exec_time", nt.UnixNano())
-	return errors.WithMessage(err, "Redis数据更新下次执行时间失败")
+	return ms.nextTime(uid, nt, ms.do)
 }
 
 func (ms *MapStore) nextTime(uid string, nt *time.Time, send Send) error {
@@ -236,4 +201,41 @@ func (ms *MapStore) do(commandName string, args ...interface{}) error {
 	}()
 	_, err := c.Do(commandName, args...)
 	return err
+}
+
+func (ms *MapStore) batch(c redis.Conn, uids []string) ([]*model.Task, error) {
+	for _, uid := range uids {
+		err := c.Send("HGETALL", fmt.Sprintf("%s_%s", ms.absoluteName, uid))
+		if err != nil {
+			return nil, errors.WithMessage(err, "Redis数据获取失败")
+		}
+	}
+	err := c.Flush()
+	if err != nil {
+		return nil, errors.WithMessage(err, "Redis数据获取失败")
+	}
+	ts := make([]*model.Task, 0, len(uids))
+	cp := ms.c.cp
+	for range uids {
+		rt, err := redis.StringMap(c.Receive())
+		if err != nil {
+			if err == redis.ErrNil {
+				continue
+			}
+			return nil, errors.WithMessage(err, "Redis数据获取失败")
+		}
+		if len(rt) == 0 {
+			continue
+		}
+		xcopy.WithSource(rt)(cp)
+		t := model.GenerateTask()
+		ts = append(ts, t)
+		if err = cp.CopyF(t); err != nil {
+			for _, t = range ts {
+				model.ReleaseTask(t)
+			}
+			return nil, errors.WithMessage(err, "Redis数据协议转换失败[Batch]")
+		}
+	}
+	return ts, nil
 }

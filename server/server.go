@@ -16,6 +16,7 @@ import (
 	"github.com/zywaited/delay-queue/protocol/pb"
 	"github.com/zywaited/delay-queue/repository/redis"
 	"github.com/zywaited/delay-queue/role"
+	"github.com/zywaited/delay-queue/role/reload"
 	"github.com/zywaited/delay-queue/role/runner"
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/task/store"
@@ -97,6 +98,9 @@ func (dq *DelayQueue) server() (err error) {
 		return
 	}
 	dq.initRunner()
+	if err = dq.reloadServer(); err != nil {
+		return
+	}
 	go func() {
 		err = dq.runProtocol()
 		if err != nil && dq.c.CB.Logger != nil {
@@ -114,20 +118,8 @@ func (dq *DelayQueue) timerServer() error {
 	sr := (timer.Scanner)(nil)
 	switch dq.c.C.Timer.St {
 	case string(tw.ServerName):
-		twc := []tw.ServerConfigOption{
-			tw.ServerConfigWithFactory(task.AcPoolFactory(task.DefaultTaskPoolFactory)),
-			tw.ServerConfigWithLogger(dq.c.CB.Logger),
-		}
-		if _, ok := dq.store.(*redis.TWStore); ok {
-			twc = append(twc, tw.ServerConfigWithReload(redis.NewReload(dq.store.(*redis.TWStore), dq.convert)))
-			twc = append(twc, tw.ServerConfigWithReloadGN(dq.c.C.Timer.TimingWheel.ReloadGoNum))
-			twc = append(twc,
-				tw.ServerConfigWithReloadScale(time.Duration(dq.c.C.Timer.TimingWheel.ReloadConfigScale)*dq.base),
-			)
-			twc = append(twc, tw.ServerConfigWithReloadPerNum(dq.c.C.Timer.TimingWheel.ReloadPerNum))
-		}
 		sr = tw.NewServer(
-			tw.NewServerConfig(twc...),
+			tw.NewServerConfig(tw.ServerConfigWithFactory(task.AcPoolFactory(task.DefaultTaskPoolFactory))),
 			tw.OptionWithSlotNum(dq.c.C.Timer.TimingWheel.SlotNum),
 			tw.OptionWithLogger(dq.c.CB.Logger),
 			tw.OptionWithMaxLevel(dq.c.C.Timer.TimingWheel.MaxLevel),
@@ -348,4 +340,26 @@ func (dq *DelayQueue) initTransporters() error {
 		trhttp.SenderOptionWithTimeout(timeout),
 	)
 	return nil
+}
+
+func (dq *DelayQueue) reloadServer() error {
+	if dq.c.C.Role&uint(role.Timer) == 0 {
+		return nil
+	}
+	if dq.timer == nil || runner.AcRunner(runner.DefaultRunnerName) == nil {
+		return errors.New("timer or runner not init")
+	}
+	if _, ok := dq.store.(*redis.TWStore); !ok {
+		return nil
+	}
+	rs := reload.NewServer(
+		reload.ServerConfigWithLogger(dq.c.CB.Logger),
+		reload.ServerConfigWithReload(redis.NewReload(dq.store.(*redis.TWStore), dq.convert)),
+		reload.ServerConfigWithReloadGN(dq.c.C.Timer.TimingWheel.ReloadGoNum),
+		reload.ServerConfigWithReloadScale(time.Duration(dq.c.C.Timer.TimingWheel.ReloadConfigScale)*dq.base),
+		reload.ServerConfigWithReloadPerNum(dq.c.C.Timer.TimingWheel.ReloadPerNum),
+		reload.ServerConfigWithTimer(dq.timer),
+		reload.ServerConfigWithRunner(runner.AcRunner(runner.DefaultRunnerName)),
+	)
+	return pkgerr.WithMessage(rs.Run(), "Reload启动失败")
 }

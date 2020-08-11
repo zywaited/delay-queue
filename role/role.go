@@ -31,3 +31,8 @@ type Launcher interface {
 
 	Stop(StopType) error
 }
+
+type LauncherStatus interface {
+	Running() bool
+	Stopped() bool
+}
