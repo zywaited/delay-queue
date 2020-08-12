@@ -57,7 +57,9 @@ func OptionWithTimer(st timer.Scanner) Option {
 
 func OptionWithMaxCheckTime(maxCheckTime int) Option {
 	return func(r *runner) {
-		r.maxCheckTime = maxCheckTime
+		if maxCheckTime > 0 {
+			r.maxCheckTime = maxCheckTime
+		}
 	}
 }
 
@@ -116,9 +118,15 @@ func (r *runner) Run(tk task.Task) error {
 	if pb.TaskType(mt.Type) == pb.TaskType_TaskFinished || mt.Times > 0 {
 		return nil
 	}
-	defer r.incrTaskRetryTimes(tk)
+	if mt.RetryTimes > r.maxCheckTime {
+		// 已经多出一次用来检测
+		r.changeStatus(tk, pb.TaskType_Ignore)
+		r.retryCheck(mt) // 为了打印日志
+		return nil
+	}
 	err = r.rq.Push(tk)
 	if err == nil {
+		r.incrTaskRetryTimes(tk)
 		r.retryCheck(mt)
 		return nil
 	}
@@ -128,7 +136,7 @@ func (r *runner) Run(tk task.Task) error {
 
 func (r *runner) retryCheck(mt *model.Task) {
 	mt.RetryTimes++
-	if r.maxCheckTime > 0 && mt.RetryTimes >= r.maxCheckTime {
+	if mt.RetryTimes > r.maxCheckTime+1 {
 		if r.logger != nil {
 			r.logger.Infof("worker task[%s] retry max times", mt.Uid)
 		}
@@ -147,6 +155,9 @@ func (r *runner) retryCheck(mt *model.Task) {
 }
 
 func (r *runner) retryDelay(tk task.Task) {
+	if r.logger != nil {
+		r.logger.Infof("worker task[%s] delay: continue", tk.Uid())
+	}
 	nt := r.tp(
 		task.ParamWithTime(task.Time{
 			TTime: time.Second * time.Duration(r.checkMulti),
@@ -201,14 +212,17 @@ func (r *runner) incrTaskRetryTimes(tk task.Task) {
 	r.logger.Infof("worker task[%s] retry status error: %v", tk.Uid(), err)
 }
 
-func (r *runner) readyStatus(tk task.Task) {
+func (r *runner) changeStatus(t task.Task, tt pb.TaskType) {
+	if r.sd == nil {
+		return
+	}
 	us, ok := r.sd.(role.DataStoreUpdater)
 	if !ok {
 		return
 	}
-	err := us.Status(tk.Uid(), pb.TaskType_TaskReady)
+	err := us.Status(t.Uid(), tt)
 	if err == nil || r.logger == nil {
 		return
 	}
-	r.logger.Infof("worker task[%s] status ready error: %v", tk.Uid(), err)
+	r.logger.Infof("worker task[%s] status ready error: %v", t.Uid(), err)
 }

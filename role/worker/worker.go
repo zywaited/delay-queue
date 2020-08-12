@@ -143,6 +143,9 @@ func (sr *Scanner) runTask(t task.Task) {
 	}()
 	mt, err := sr.op.store.Retrieve(t.Uid())
 	if err != nil {
+		if sr.op.logger != nil {
+			sr.op.logger.Infof("worker run task[%s] error[Retrieve]: %v", t.Uid(), err)
+		}
 		return
 	}
 	defer model.ReleaseTask(mt)
@@ -164,11 +167,12 @@ func (sr *Scanner) runTask(t task.Task) {
 		}
 		return
 	}
-	sr.changeStatus(t, pb.TaskType_TaskReserved)
+	// 意义不大了，因为runner会重置
+	//sr.changeStatus(t, pb.TaskType_TaskReserved)
 	retryTimes := 0
 	req := sr.pbReq.Get().(*pb.CallBackReq)
-	req.Uid = t.Uid()
-	req.Name = t.Name()
+	req.Uid = mt.Uid
+	req.Name = mt.Name
 	req.Url = ""
 	cd := sr.pbCallbackInfo.Get().(*pb.CallbackInfo)
 	cd.Schema = mt.Schema

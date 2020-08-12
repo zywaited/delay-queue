@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,8 +66,14 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 		s.bp.Put(bt)
 	}()
 	bt.Write(bs)
-	_, err = s.s.Post(req.Url, "application/json", bt)
-	return pkgerr.WithMessagef(err, "HTTP SEND failed: %s: %v", bs, err)
+	resp, err := s.s.Post(req.Url, "application/json", bt)
+	if err != nil {
+		return pkgerr.WithMessagef(err, "HTTP SEND failed: %s: %v", bs, err)
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("HTTP SEND failed: %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func (s *Sender) Valid(addr *pb.CallbackInfo) error {

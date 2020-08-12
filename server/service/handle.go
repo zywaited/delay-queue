@@ -44,6 +44,16 @@ func NewHandle(opts ...HandleOption) *Handle {
 	return h
 }
 
+func (h *Handle) parseAddReq(addReq *pb.AddReq) {
+	addReq.Time.Duration = int64(time.Duration(addReq.Time.Duration) * h.baseTime)
+	if !addReq.Time.Relative {
+		return
+	}
+	// 强制改为绝对时间
+	addReq.Time.Relative = false
+	addReq.Time.Duration += time.Now().UnixNano()
+}
+
 func (h *Handle) generateId(addReq *pb.AddReq) string {
 	bs, err := addReq.XXX_Marshal(nil, false)
 	if err != nil {
@@ -63,14 +73,14 @@ func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
 			err = errors.New("add task panic")
 		}
 	}()
-	tt := task.RelativeTime
-	if !addReq.Time.Relative {
-		tt = task.AbsoluteTime
+	delayTime := time.Duration(addReq.Time.Duration)
+	if addReq.Time.Relative {
+		delayTime = time.Duration(time.Now().UnixNano()) + time.Duration(addReq.Time.Duration)*h.baseTime
 	}
 	t := h.tp(
 		task.ParamWithTime(task.Time{
-			TTime: time.Duration(addReq.Time.Duration) * h.baseTime,
-			TType: tt,
+			TTime: delayTime,
+			TType: task.AbsoluteTime,
 		}),
 		task.ParamWithUid(uid),
 		task.ParamWithName(addReq.Name),
@@ -118,6 +128,7 @@ func (h *Handle) Add(ctx context.Context, addReq *pb.AddReq) (*pb.AddResp, error
 			addReq.Callback.Schema,
 		)
 	}
+	h.parseAddReq(addReq)
 	uid := h.generateId(addReq)
 	if uid == "" {
 		return nil, xerror.New("生成任务唯一标识失败")
