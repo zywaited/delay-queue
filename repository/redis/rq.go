@@ -25,7 +25,7 @@ func NewReadyQueue(rp *redis.Pool, store role.DataStore, opts ...ConfigOption) *
 		rp:    rp,
 		store: store,
 	}
-	rq.absoluteName = rq.c.prefix + "_" + rq.c.name
+	rq.absoluteName = rq.c.absoluteName() + "_list"
 	return rq
 }
 

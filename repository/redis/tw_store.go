@@ -28,7 +28,7 @@ func NewTWStore(rp *redis.Pool, opts ...ConfigOption) *TWStore {
 			return &TWStoreTrans{}
 		}},
 	}
-	tws.absoluteName = tws.MapStore.absoluteName + "_set"
+	tws.absoluteName = tws.c.absoluteName() + "_set"
 	return tws
 }
 

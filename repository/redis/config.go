@@ -1,18 +1,21 @@
 package redis
 
 import (
+	"fmt"
+
 	"github.com/zywaited/delay-queue/role"
 	"github.com/zywaited/go-common/xcopy"
 )
 
 const (
-	DefaultSortedSetPrefix = "med-delay-queue"
-	DefaultSortedSetName   = "timing-task"
+	DefaultStorePrefix = "med-delay-queue"
+	DefaultStoreName   = "timing-task"
 )
 
 type config struct {
 	prefix string
 	name   string
+	id     string
 
 	cp      *xcopy.XCopy // 仅仅是为了内部尽量减少全局变量依赖
 	convert role.PbConvertTask
@@ -44,13 +47,30 @@ func ConfigWithConvert(convert role.PbConvertTask) ConfigOption {
 	}
 }
 
+func ConfigWithId(id string) ConfigOption {
+	return func(c *config) {
+		c.id = id
+	}
+}
+
 func NewConfig(opts ...ConfigOption) *config {
 	c := &config{
-		prefix: DefaultSortedSetPrefix,
-		name:   DefaultSortedSetName,
+		prefix: DefaultStorePrefix,
+		name:   DefaultStoreName,
 	}
 	for _, opt := range opts {
 		opt(c)
 	}
 	return c
+}
+
+func (c *config) absoluteName() string {
+	if c.id == "" {
+		return fmt.Sprintf("%s_%s", c.prefix, c.name)
+	}
+	return fmt.Sprintf("%s_%s_%s", c.prefix, c.name, c.id)
+}
+
+func (c *config) storeName() string {
+	return c.prefix + "_" + c.name
 }

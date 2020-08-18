@@ -33,8 +33,8 @@ func NewMapStore(rp *redis.Pool, opts ...ConfigOption) *MapStore {
 			return make([]interface{}, 0, 20) // 先给20字段长度
 		}},
 	}
-	ms.absoluteName = ms.c.prefix + "_" + ms.c.name
-	ms.idAbsoluteName = ms.c.prefix + "_ID"
+	ms.absoluteName = ms.c.storeName() + "_hash"
+	ms.idAbsoluteName = ms.c.storeName() + "_id"
 	if ms.c.cp == nil {
 		ms.c.cp = xcopy.NewCopy()
 	}

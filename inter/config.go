@@ -21,7 +21,7 @@ type Config struct {
 type GenerateIdConfig struct {
 	Type    string
 	Timeout int64
-	Group   *GroupConfig `valid:"required"`
+	Group   *GroupConfig
 }
 
 type LogConfig struct {

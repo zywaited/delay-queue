@@ -25,7 +25,7 @@ func NewSortedSet(rp *redis.Pool, store role.DataStore, opts ...ConfigOption) *S
 		rp:    rp,
 		store: store,
 	}
-	s.absoluteName = s.c.prefix + "_" + s.c.name
+	s.absoluteName = s.c.absoluteName()
 	return s
 }
 

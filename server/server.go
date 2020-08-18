@@ -108,7 +108,7 @@ func (dq *DelayQueue) server() (err error) {
 		}
 	}()
 	_ = dq.runWorker()
-	return nil
+	return
 }
 
 func (dq *DelayQueue) timerServer() error {
@@ -205,7 +205,8 @@ func (dq *DelayQueue) httpServer(c chan error, handler pb.DelayQueueServer) {
 func (dq *DelayQueue) initStore() error {
 	rcs := []redis.ConfigOption{
 		redis.ConfigWithPrefix(dq.c.C.DataSource.Redis.Prefix),
-		redis.ConfigWithName(dq.c.C.DataSource.Redis.Name + "_" + dq.timerId),
+		redis.ConfigWithName(dq.c.C.DataSource.Redis.Name),
+		redis.ConfigWithId(dq.timerId),
 		redis.ConfigWithConvert(dq.convert),
 		redis.ConfigWithCopy(dq.cp),
 	}
@@ -229,10 +230,7 @@ func (dq *DelayQueue) initStore() error {
 	}
 
 	// init ready-queue
-	rcs[0] = redis.ConfigWithPrefix(dq.c.C.DataSource.Redis.Prefix)
-	if dq.workerId != "" {
-		rcs[0] = redis.ConfigWithPrefix(dq.c.C.DataSource.Redis.Prefix + "_" + dq.workerId)
-	}
+	rcs[2] = redis.ConfigWithId(dq.workerId) // 重置ID
 	dq.rq = redis.NewReadyQueue(dq.c.CB.Redis, dq.store, rcs...)
 	return nil
 }
@@ -322,6 +320,9 @@ func (dq *DelayQueue) initId() error {
 	case <-d:
 	case <-c:
 		return errors.New("generate id timeout")
+	}
+	if dq.c.CB.Logger != nil {
+		dq.c.CB.Logger.Infof("SERVER NAME: %s: %s", dq.timerId, dq.workerId)
 	}
 	return nil
 }

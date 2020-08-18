@@ -2,6 +2,7 @@ package inter
 
 import (
 	"errors"
+	"os"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -98,16 +99,36 @@ func ConfigDataWithValidatorStore(cd *ConfigData) error {
 	return pkgerr.WithMessage(err, "redis store's config is error")
 }
 
+const (
+	TimerIDEnvName  = "MED_DELAY_QUEUE_TIMER_NAME"
+	WorkerIDEnvName = "MED_DELAY_QUEUE_WORKER_NAME"
+)
+
 func ConfigDataWithGenerateId(cd *ConfigData) error {
 	_, err := govalidator.ValidateStruct(cd.C.GenerateId)
 	if err != nil {
 		return pkgerr.WithMessage(err, "generate-id's config is error")
 	}
+	var gi role.GenerateId
 	switch cd.C.GenerateId.Type {
+	case "local.name":
+		// 读取有状态服务的名称
+		gi = func() (timerId string, workerId string) {
+			hostname, err := os.Hostname()
+			if err == nil {
+				return hostname, os.Getenv(WorkerIDEnvName)
+			}
+			return os.Getenv(TimerIDEnvName), os.Getenv(WorkerIDEnvName)
+		}
 	default:
-		role.RegisterGenerateId(func() (timerId string, workerId string) {
+		_, err = govalidator.ValidateStruct(cd.C.GenerateId.Group)
+		if err != nil {
+			return pkgerr.WithMessage(err, "generate-id's group config is error")
+		}
+		gi = func() (timerId string, workerId string) {
 			return cd.C.GenerateId.Group.Group + "-" + cd.C.GenerateId.Group.Id, ""
-		})
+		}
 	}
+	role.RegisterGenerateId(gi)
 	return nil
 }
