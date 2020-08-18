@@ -35,6 +35,9 @@ func (st *TWStoreTrans) Status(uid string, tt pb.TaskType) error {
 	if tt == pb.TaskType_TaskFinished || tt == pb.TaskType_Ignore {
 		return st.interRemove(st.c, uid)
 	}
+	if tt == pb.TaskType_TaskDelay {
+		return st.status(uid, tt, st.c.Send)
+	}
 	return nil
 }
 

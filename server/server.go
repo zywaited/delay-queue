@@ -262,6 +262,7 @@ func (dq *DelayQueue) runProtocol() error {
 		service.HandleOptionWithTimer(dq.timer),
 		service.HandleOptionWithStore(dq.store),
 		service.HandleOptionTransporters(dq.transports),
+		service.HandleOptionWithWait(dq.c.C.Services.Wait),
 	)
 	c := make(chan error)
 	defer close(c)

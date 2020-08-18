@@ -5,10 +5,11 @@ package pb;
 // 根据文档定义常量
 enum TaskType {
     Ignore = 0;
-    TaskDelay = 1;
-    TaskReady = 2;
-    TaskReserved = 3;
-    TaskFinished = 4;
-    TaskRetryDelay = 5;
-    TaskCheck = 6;
+    TaskStore = 1;
+    TaskDelay = 2;
+    TaskReady = 3;
+    TaskReserved = 4;
+    TaskFinished = 5;
+    TaskRetryDelay = 6;
+    TaskCheck = 7;
 }

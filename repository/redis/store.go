@@ -163,7 +163,16 @@ func (ms *MapStore) Status(uid string, tt pb.TaskType) error {
 	if tt == pb.TaskType_TaskFinished || tt == pb.TaskType_Ignore {
 		return ms.Remove(uid)
 	}
+	// 只有delay状态要变更
+	if tt == pb.TaskType_TaskDelay {
+		return ms.status(uid, tt, ms.do)
+	}
 	return nil
+}
+
+func (ms *MapStore) status(uid string, tt pb.TaskType, send Send) error {
+	key := fmt.Sprintf("%s_%s", ms.absoluteName, uid)
+	return errors.WithMessage(send("HSET", key, "type", int32(tt)), "Redis数据更新状态失败")
 }
 
 func (ms *MapStore) NextTime(uid string, nt *time.Time) error {

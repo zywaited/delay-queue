@@ -68,3 +68,9 @@ func HandleOptionTransporters(ts transport.TransporterM) HandleOption {
 		}
 	}
 }
+
+func HandleOptionWithWait(wait bool) HandleOption {
+	return func(h *Handle) {
+		h.wait = wait
+	}
+}

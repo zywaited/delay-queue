@@ -34,6 +34,7 @@ type Handle struct {
 	logger   system.Logger
 	cp       *xcopy.XCopy
 	ts       transport.TransporterM
+	wait     bool
 }
 
 func NewHandle(opts ...HandleOption) *Handle {
@@ -73,6 +74,15 @@ func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
 			err = errors.New("add task panic")
 		}
 	}()
+	// 如果已经存在了直接返回
+	rmt, err := h.store.Retrieve(uid)
+	if err != nil && !xerror.IsXCode(err, xcode.DBRecordNotFound) {
+		return pkgerr.WithMessage(err, "任务查询失败")
+	}
+	if err == nil && rmt.Type != int32(pb.TaskType_TaskStore) {
+		model.ReleaseTask(rmt)
+		return
+	}
 	delayTime := time.Duration(addReq.Time.Duration)
 	if addReq.Time.Relative {
 		delayTime = time.Duration(time.Now().UnixNano()) + time.Duration(addReq.Time.Duration)*h.baseTime
@@ -88,31 +98,38 @@ func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
 		task.ParamWithType(pb.TaskType_TaskDelay),
 	)
 	now := time.Now().UnixNano()
-	mt := model.GenerateTask()
-	mt.Uid = uid
-	mt.Name = addReq.Name
-	mt.Type = int32(pb.TaskType_TaskDelay)
-	mt.ExecTime = int64(t.Exec())
-	mt.Schema = addReq.Callback.Schema
-	mt.Address = addReq.Callback.Address
-	mt.Path = addReq.Callback.Path
-	mt.CreatedAt = now
-	mt.UpdatedAt = now
-	defer model.ReleaseTask(mt)
-	err = pkgerr.WithMessage(h.store.Insert(mt), "任务写入存储失败")
 	if err != nil {
-		return
+		// 该分支代表已经写入存储，但未入队列
+		mt := model.GenerateTask()
+		mt.Uid = uid
+		mt.Name = addReq.Name
+		mt.Type = int32(pb.TaskType_TaskStore)
+		mt.ExecTime = int64(t.Exec())
+		mt.Schema = addReq.Callback.Schema
+		mt.Address = addReq.Callback.Address
+		mt.Path = addReq.Callback.Path
+		mt.CreatedAt = now
+		mt.UpdatedAt = now
+		defer model.ReleaseTask(mt)
+		err = pkgerr.WithMessage(h.store.Insert(mt), "任务写入存储失败")
+		if err != nil {
+			return
+		}
 	}
 	pt, ok := t.(task.Result)
-	if ok {
+	if ok && h.wait {
 		pt.InitResult()
 	}
 	err = pkgerr.WithMessage(h.timer.Add(t), "任务写入扫描器失败")
 	if err != nil {
 		return
 	}
-	if ok {
+	if ok && h.wait {
 		err = pkgerr.WithMessage(pt.WaitResult(), "任务写入扫描器失败")
+	}
+	us, ok := h.store.(role.DataStoreUpdater)
+	if ok {
+		_ = us.Status(uid, pb.TaskType_TaskDelay)
 	}
 	return
 }

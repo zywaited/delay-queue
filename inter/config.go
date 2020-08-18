@@ -83,6 +83,7 @@ type RedisConnectConfig struct {
 
 type ServiceConfig struct {
 	Types []string           // GRPC\HTTP
+	Wait  bool               // 是否等待
 	HTTP  *HttpServiceConfig `toml:"http"`
 	GRPC  *GRPCServiceConfig `toml:"grpc"`
 }

@@ -145,7 +145,8 @@ func NewTaskResult(opts ...ParamField) *taskResult {
 }
 
 func (r *taskResult) InitResult() {
-	r.c = make(chan error)
+	// 这里需要缓冲，不然很多逻辑需要异步处理
+	r.c = make(chan error, 1)
 	r.closed = false
 }
 

@@ -177,5 +177,5 @@ func (tws *TWStore) Status(uid string, tt pb.TaskType) error {
 	if tt == pb.TaskType_TaskFinished || tt == pb.TaskType_Ignore {
 		return tws.Remove(uid)
 	}
-	return nil
+	return tws.MapStore.Status(uid, tt)
 }
