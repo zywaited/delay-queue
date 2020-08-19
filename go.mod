@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535
+	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.6.3

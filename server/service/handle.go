@@ -46,6 +46,10 @@ func NewHandle(opts ...HandleOption) *Handle {
 }
 
 func (h *Handle) parseAddReq(addReq *pb.AddReq) {
+	if addReq.Time == nil {
+		addReq.Time = &pb.ExecTime{Duration: time.Now().UnixNano()}
+		return
+	}
 	addReq.Time.Duration = int64(time.Duration(addReq.Time.Duration) * h.baseTime)
 	if !addReq.Time.Relative {
 		return
@@ -138,12 +142,16 @@ func (h *Handle) Add(ctx context.Context, addReq *pb.AddReq) (*pb.AddResp, error
 	if _, err := govalidator.ValidateStruct(addReq); err != nil {
 		return nil, xerror.WithXCode(xcode.RequestParamError)
 	}
-	if h.ts[transport.TransporterType(strings.ToUpper(strings.TrimSpace(addReq.Callback.Schema)))] == nil {
+	tr := h.ts[transport.TransporterType(strings.ToUpper(strings.TrimSpace(addReq.Callback.Schema)))]
+	if tr == nil {
 		return nil, xerror.WithXCodeMessagef(
 			xcode.RequestParamError,
 			"schema not support: %s",
 			addReq.Callback.Schema,
 		)
+	}
+	if err := tr.Valid(addReq.Callback); err != nil {
+		return nil, xerror.WithXCodeMessage(xcode.RequestParamError, err.Error())
 	}
 	h.parseAddReq(addReq)
 	uid := h.generateId(addReq)
