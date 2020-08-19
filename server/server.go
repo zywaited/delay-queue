@@ -57,6 +57,11 @@ func (dq *DelayQueue) Run() error {
 	if err != nil {
 		return pkgerr.WithMessage(err, "读取配置失败")
 	}
+	dq.base = time.Millisecond
+	switch dq.c.C.BaseLevel {
+	case "second":
+		dq.base = time.Second
+	}
 	if err = dq.initId(); err != nil {
 		return err
 	}
@@ -64,11 +69,6 @@ func (dq *DelayQueue) Run() error {
 	dq.convert = role.NewDefaultPbConvertTask(task.AcTaskPoolFactory(task.DefaultTaskPoolFactory))
 	if err = dq.initStore(); err != nil {
 		return err
-	}
-	dq.base = time.Millisecond
-	switch dq.c.C.BaseLevel {
-	case "second":
-		dq.base = time.Second
 	}
 	// 服务启动放到最后
 	err = dq.server()
@@ -333,7 +333,7 @@ func (dq *DelayQueue) initTransporters() error {
 	if dq.c.C.Role&uint(role.Timer) != 0 {
 		timeout = time.Duration(dq.c.C.Timer.Timeout)
 	}
-	if dq.c.C.Role&uint(role.Worker) == 0 {
+	if dq.c.C.Role&uint(role.Worker) != 0 {
 		timeout = time.Duration(dq.c.C.Worker.Timeout)
 	}
 	timeout *= dq.base
