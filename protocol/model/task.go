@@ -12,6 +12,7 @@ type Task struct {
 
 	Uid          string `json:"uid"`
 	Name         string `json:"name"`
+	Args         string `json:"args"`
 	Type         int32  `json:"type"`
 	Times        int    `json:"times"`                    // 发送次数
 	RetryTimes   int    `json:"retry_times"`              // 重试次数

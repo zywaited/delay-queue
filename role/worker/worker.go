@@ -173,6 +173,7 @@ func (sr *Scanner) runTask(t task.Task) {
 	req := sr.pbReq.Get().(*pb.CallBackReq)
 	req.Uid = mt.Uid
 	req.Name = mt.Name
+	req.Args = mt.Args
 	req.Url = ""
 	cd := sr.pbCallbackInfo.Get().(*pb.CallbackInfo)
 	cd.Schema = mt.Schema

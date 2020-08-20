@@ -24,6 +24,8 @@ message AddReq {
     ExecTime time = 2;
     // @inject_tag: valid:"required" 回调路径
     CallbackInfo callback = 3;
+    // 返回参数(worker回调时返回，尽量传输小数据，如果有需要自行存储在业务，与uid做绑定)
+    string args = 4;
 }
 
 message AddResp {
@@ -46,4 +48,5 @@ message CallBackReq {
     string uid = 1;
     string name = 2;
     string url = 3;
+    string args = 4;
 }

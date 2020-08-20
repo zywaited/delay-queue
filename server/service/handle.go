@@ -107,6 +107,7 @@ func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
 		mt := model.GenerateTask()
 		mt.Uid = uid
 		mt.Name = addReq.Name
+		mt.Args = addReq.Args
 		mt.Type = int32(pb.TaskType_TaskStore)
 		mt.ExecTime = int64(t.Exec())
 		mt.Schema = addReq.Callback.Schema
@@ -207,6 +208,7 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 			return nil, xerror.Wrap(err, "任务查询失败")
 		}
 		pt := &pb.Task{}
+		defer model.ReleaseTask(mt)
 		if err = h.cp.SetSource(mt).CopyF(pt); err != nil {
 			return nil, xerror.Wrap(err, "任务数据协议转换失败")
 		}
