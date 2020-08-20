@@ -28,6 +28,7 @@ import (
 	"github.com/zywaited/delay-queue/server/api/http"
 	"github.com/zywaited/delay-queue/server/service"
 	"github.com/zywaited/delay-queue/transport"
+	trgrpc "github.com/zywaited/delay-queue/transport/grpc"
 	trhttp "github.com/zywaited/delay-queue/transport/http"
 	"github.com/zywaited/go-common/xcopy"
 	ogrpc "google.golang.org/grpc"
@@ -341,6 +342,10 @@ func (dq *DelayQueue) initTransporters() error {
 	th := trhttp.NewSender(trhttp.SenderOptionWithTimeout(timeout))
 	dq.transports[transport.TransporterType(trhttp.SendersType)] = th
 	dq.transports[transport.TransporterType(trhttp.SenderHttpsType)] = th
+	dq.transports[transport.TransporterType(trgrpc.SendersType)] = trgrpc.NewSender(
+		trgrpc.SenderOptionWithTimeout(timeout),
+		trgrpc.SenderOptionWithLogger(dq.c.CB.Logger),
+	)
 	return nil
 }
 

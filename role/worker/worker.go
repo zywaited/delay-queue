@@ -186,10 +186,10 @@ func (sr *Scanner) runTask(t task.Task) {
 		// todo 后续判断是否可发送(重复发送)
 		err = tr.Send(cd, req)
 		if err != nil {
-			if sr.op.logger != nil {
-				sr.op.logger.Infof("worker run task[%s] error: %v", t.Uid(), err)
-			}
 			if retryTimes >= sr.op.retryTimes {
+				if sr.op.logger != nil {
+					sr.op.logger.Infof("worker run task[%s] error: %v", t.Uid(), err)
+				}
 				break
 			}
 			retryTimes++
