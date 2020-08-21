@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/protobuf/ptypes/any"
 	pkgerr "github.com/pkg/errors"
 	mgrpc "github.com/zywaited/delay-queue/middleware/grpc"
 	"github.com/zywaited/delay-queue/parser/system"
@@ -232,7 +233,16 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 		return errors.New("connect timeout or grpc dial error")
 	}
 	req.Url = s.uri(addr)
-	_, err := pb.NewCallbackClient(c.gc).Send(ctx, req)
+	var err error
+	if addr.Path == "" {
+		// 默认使用该服务
+		_, err = pb.NewCallbackClient(c.gc).Send(ctx, req)
+	} else {
+		// 指定服务端，那只有直接走逻辑调用
+		// 规定：返回值必须是empty.Empty
+		out := new(any.Any)
+		err = c.gc.Invoke(ctx, "/"+strings.TrimLeft(addr.Path, "/"), req, out)
+	}
 	return pkgerr.WithMessage(err, "call grpc faileds")
 }
 

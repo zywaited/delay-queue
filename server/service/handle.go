@@ -106,13 +106,13 @@ func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
 		// 该分支代表已经写入存储，但未入队列
 		mt := model.GenerateTask()
 		mt.Uid = uid
-		mt.Name = addReq.Name
-		mt.Args = addReq.Args
+		mt.Name = strings.TrimSpace(addReq.Name)
+		mt.Args = strings.TrimSpace(addReq.Args)
 		mt.Type = int32(pb.TaskType_TaskStore)
 		mt.ExecTime = int64(t.Exec())
-		mt.Schema = addReq.Callback.Schema
-		mt.Address = addReq.Callback.Address
-		mt.Path = addReq.Callback.Path
+		mt.Schema = strings.TrimSpace(addReq.Callback.Schema)
+		mt.Address = strings.TrimSpace(addReq.Callback.Address)
+		mt.Path = strings.TrimSpace(addReq.Callback.Path)
 		mt.CreatedAt = now
 		mt.UpdatedAt = now
 		defer model.ReleaseTask(mt)
@@ -260,14 +260,14 @@ func (h *Handle) remove(uid string) (err error) {
 	t := h.tp(task.ParamWithUid(uid))
 	defer t.Release()
 	pt, ok := t.(task.Result)
-	if ok {
+	if ok && h.wait {
 		pt.InitResult()
 	}
 	err = pkgerr.WithMessage(h.timer.Remove(t), "任务删除扫描器失败")
 	if err != nil {
 		return
 	}
-	if ok {
+	if ok && h.wait {
 		err = pkgerr.WithMessage(pt.WaitResult(), "任务删除扫描器失败")
 	}
 	return
