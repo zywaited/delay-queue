@@ -163,7 +163,7 @@ func (h *Handle) Add(ctx context.Context, addReq *pb.AddReq) (*pb.AddResp, error
 	if h.logger != nil {
 		h.logger.Infof("[%s]generate task uid: %s", traceId, uid)
 	}
-	c := make(chan error)
+	c := make(chan error, 1)
 	go func() {
 		c <- h.add(uid, addReq)
 	}()
@@ -183,7 +183,7 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		return nil, xerror.WithXCode(xcode.RequestParamError)
 	}
 	uid := strings.TrimSpace(req.Uid)
-	c := make(chan error)
+	c := make(chan error, 1)
 	var (
 		mt  *model.Task
 		err error
@@ -221,7 +221,7 @@ func (h *Handle) Remove(ctx context.Context, req *pb.RemoveReq) (*empty.Empty, e
 		return nil, xerror.WithXCode(xcode.RequestParamError)
 	}
 	uid := strings.TrimSpace(req.Uid)
-	c := make(chan error)
+	c := make(chan error, 1)
 	go func() {
 		c <- h.remove(uid)
 	}()
