@@ -208,9 +208,9 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 					_ = recover()
 					close(c.c)
 				}()
-				tx := context.Background()
+				tx := ctx
 				if s.connectTime > 0 {
-					tctx, cancel := context.WithTimeout(context.Background(), s.connectTime)
+					tctx, cancel := context.WithTimeout(tx, s.connectTime)
 					defer cancel()
 					tx = tctx
 				}
