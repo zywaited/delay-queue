@@ -154,7 +154,23 @@ func (tws *TWStore) rangeReady(st, et, offset, limit int64) ([]*model.Task, erro
 		}
 		return nil, errors.WithMessage(err, "redis查询当前分值的任务失败")
 	}
-	return tws.batch(c, uids)
+	// 这里处理下空数据
+	emptyUids := make([]string, 0, len(uids))
+	mts, err := tws.batchWithEmpty(c, uids, func(uid string) {
+		emptyUids = append(emptyUids, uid)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(emptyUids) == 0 {
+		return mts, nil
+	}
+	// 这里不用事务，删除一个算一个
+	for _, uid := range emptyUids {
+		_ = c.Send("ZREM", tws.absoluteName, uid)
+	}
+	_ = c.Flush()
+	return mts, nil
 }
 
 func (tws *TWStore) readyNum(st, et int64) (int, error) {

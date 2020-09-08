@@ -213,6 +213,10 @@ func (ms *MapStore) do(commandName string, args ...interface{}) error {
 }
 
 func (ms *MapStore) batch(c redis.Conn, uids []string) ([]*model.Task, error) {
+	return ms.batchWithEmpty(c, uids, nil)
+}
+
+func (ms *MapStore) batchWithEmpty(c redis.Conn, uids []string, emptyFn func(string)) ([]*model.Task, error) {
 	for _, uid := range uids {
 		err := c.Send("HGETALL", fmt.Sprintf("%s_%s", ms.absoluteName, uid))
 		if err != nil {
@@ -225,15 +229,21 @@ func (ms *MapStore) batch(c redis.Conn, uids []string) ([]*model.Task, error) {
 	}
 	ts := make([]*model.Task, 0, len(uids))
 	cp := ms.c.cp
-	for range uids {
+	for _, uid := range uids {
 		rt, err := redis.StringMap(c.Receive())
 		if err != nil {
 			if err == redis.ErrNil {
+				if emptyFn != nil {
+					emptyFn(uid)
+				}
 				continue
 			}
 			return nil, errors.WithMessage(err, "Redis数据获取失败")
 		}
 		if len(rt) == 0 {
+			if emptyFn != nil {
+				emptyFn(uid)
+			}
 			continue
 		}
 		xcopy.WithSource(rt)(cp)

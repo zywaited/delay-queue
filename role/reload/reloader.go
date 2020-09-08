@@ -66,8 +66,14 @@ func ServerConfigWithTimer(sr timer.Scanner) ServerConfigOption {
 	}
 }
 
+// 默认加载数量
+const (
+	defaultReloadGN     = 1
+	defaultReloadPerNum = 50
+)
+
 func NewServer(opts ...ServerConfigOption) *server {
-	s := &server{}
+	s := &server{reloadGN: defaultReloadGN, reloadPerNum: defaultReloadPerNum}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -114,68 +120,70 @@ func (s *server) run() {
 	if s.logger != nil {
 		s.logger.Info("reload latest task start")
 	}
-	gn := l/s.reloadGN + 1
+	maxNum := l/s.reloadGN + 1
 	wg := &sync.WaitGroup{}
 	wg.Add(s.reloadGN)
-	fn := func(index int) {
-		defer func() {
-			rerr := recover()
-			wg.Done()
-			if rerr == nil || s.logger == nil {
-				return
-			}
-			s.logger.Infof("reload latest task err: %v, stack: %s", rerr, system.Stack())
-		}()
-		offset := gn * index
-		limit := s.reloadPerNum
-		num := 0
-		maxTimeout := 10
-		currentTimeout := 0
-		for {
-			if gn-num < limit {
-				limit = gn - num
-			}
-			if limit == 0 {
-				break
-			}
-			ts, err := s.reload.Reload(int64(offset), int64(limit))
-			if err != nil {
-				if s.logger == nil {
-					return
-				}
-				s.logger.Infof("reload latest task err: %v", err)
-				if currentTimeout < maxTimeout {
-					currentTimeout++
-				}
-				time.Sleep(s.reloadScale << currentTimeout)
-				continue
-			}
-			if len(ts) == 0 {
-				return
-			}
-			offset += limit
-			num += len(ts)
-			for _, t := range ts {
-				rt, ok := t.(task.RunnerTask)
-				if !ok {
-					continue
-				}
-				rt.InitRunner(s.runner)
-				err = s.sr.Add(t)
-				if err == nil || s.logger == nil {
-					continue
-				}
-				s.logger.Infof("reload latest task[%s] err: %v", t.Uid(), err)
-			}
-			time.Sleep(s.reloadScale)
-			currentTimeout = 0
-		}
-	}
 	for index := 0; index < s.reloadGN; index++ {
-		go fn(index)
+		go func(index int) {
+			defer wg.Done()
+			s.task(index, maxNum, s.reloadPerNum)
+		}(index)
 	}
 	wg.Wait()
 	if s.logger != nil {
 		s.logger.Info("reload latest task end")
+	}
+}
+
+func (s *server) task(index, maxNum, limit int) {
+	defer func() {
+		rerr := recover()
+		if rerr == nil || s.logger == nil {
+			return
+		}
+		s.logger.Infof("reload latest task err: %v, stack: %s", rerr, system.Stack())
+	}()
+	offset := maxNum * index
+	fetchedNum := 0
+	maxTimeout := 10
+	currentTimeout := 0
+	for {
+		if maxNum-fetchedNum < limit {
+			limit = maxNum - fetchedNum
+		}
+		if limit <= 0 {
+			break
+		}
+		ts, err := s.reload.Reload(int64(offset), int64(limit))
+		if err != nil {
+			if s.logger == nil {
+				return
+			}
+			s.logger.Infof("reload latest task err: %v", err)
+			if currentTimeout < maxTimeout {
+				currentTimeout++
+			}
+			time.Sleep(s.reloadScale << currentTimeout)
+			continue
+		}
+		if len(ts) == 0 {
+			return
+		}
+		offset += limit
+		fetchedNum += limit
+		for _, t := range ts {
+			rt, ok := t.(task.RunnerTask)
+			if !ok {
+				continue
+			}
+			rt.InitRunner(s.runner)
+			err = s.sr.Add(t)
+			if err == nil || s.logger == nil {
+				continue
+			}
+			s.logger.Infof("reload latest task[%s] err: %v", t.Uid(), err)
+		}
+		time.Sleep(s.reloadScale)
+		currentTimeout = 0
 	}
 }
