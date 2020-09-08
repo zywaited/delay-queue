@@ -103,7 +103,10 @@ func (r *runner) Run(tk task.Task) error {
 	if err != nil {
 		if !xerror.IsXCode(err, xcode.DBRecordNotFound) {
 			r.retryDelay(tk)
+			return nil
 		}
+		// todo 这里查询不到数据有可能是被其他worker处理或者是删除，这里再删除一次
+		r.removeNotExistTask(tk)
 		return nil
 	}
 	defer model.ReleaseTask(mt)
@@ -225,4 +228,15 @@ func (r *runner) changeStatus(t task.Task, tt pb.TaskType) {
 		return
 	}
 	r.logger.Infof("worker task[%s] status ready error: %v", t.Uid(), err)
+}
+
+func (r *runner) removeNotExistTask(t task.Task) {
+	if r.sd == nil {
+		return
+	}
+	err := r.sd.Remove(t.Uid())
+	if err == nil || r.logger == nil {
+		return
+	}
+	r.logger.Infof("worker task[%s] remove error: %v", t.Uid(), err)
 }
