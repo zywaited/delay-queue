@@ -147,6 +147,7 @@ func (s *server) task(index, maxNum, limit int) {
 	fetchedNum := 0
 	maxTimeout := 10
 	currentTimeout := 0
+	validNum := 0
 	for {
 		if maxNum-fetchedNum < limit {
 			limit = maxNum - fetchedNum
@@ -166,11 +167,9 @@ func (s *server) task(index, maxNum, limit int) {
 			time.Sleep(s.reloadScale << currentTimeout)
 			continue
 		}
-		if len(ts) == 0 {
-			return
-		}
 		offset += limit
 		fetchedNum += limit
+		validNum += len(ts)
 		for _, t := range ts {
 			rt, ok := t.(task.RunnerTask)
 			if !ok {
@@ -186,4 +185,8 @@ func (s *server) task(index, maxNum, limit int) {
 		time.Sleep(s.reloadScale)
 		currentTimeout = 0
 	}
+	if s.logger != nil {
+		s.logger.Infof("reload task num[%d / %d]", validNum, fetchedNum)
+	}
+
 }
