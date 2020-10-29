@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/save95/xerror"
+	"github.com/save95/xerror/xcode"
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role"
 	"github.com/zywaited/delay-queue/role/task"
@@ -13,6 +15,7 @@ import (
 type (
 	server struct {
 		reload       role.GenerateLoseTask
+		st           role.DataStore
 		logger       system.Logger
 		reloadGN     int
 		reloadScale  time.Duration
@@ -65,6 +68,11 @@ func ServerConfigWithTimer(sr timer.Scanner) ServerConfigOption {
 		sc.sr = sr
 	}
 }
+func ServerConfigWithStore(st role.DataStore) ServerConfigOption {
+	return func(sc *server) {
+		sc.st = st
+	}
+}
 
 // 默认加载数量
 const (
@@ -81,7 +89,10 @@ func NewServer(opts ...ServerConfigOption) *server {
 }
 
 func (s *server) Run() error {
-	go s.run()
+	go func() {
+		s.run()
+		s.finish()
+	}()
 	return nil
 }
 
@@ -117,8 +128,12 @@ func (s *server) run() {
 			time.Sleep(s.reloadScale)
 		}
 	}
+	// 标记重载开始
+	if rst, ok := s.st.(role.ReloadStore); ok {
+		rst.Start()
+	}
 	if s.logger != nil {
-		s.logger.Info("reload latest task start")
+		s.logger.Infof("reload latest task start: %d", l)
 	}
 	maxNum := l/s.reloadGN + 1
 	wg := &sync.WaitGroup{}
@@ -167,6 +182,9 @@ func (s *server) task(index, maxNum, limit int) {
 			time.Sleep(s.reloadScale << currentTimeout)
 			continue
 		}
+		if s.logger != nil {
+			s.logger.Infof("reload task[%d] args[%d - %d], uid-len: %d", index, offset, limit, len(ts))
+		}
 		offset += limit
 		fetchedNum += limit
 		validNum += len(ts)
@@ -186,7 +204,67 @@ func (s *server) task(index, maxNum, limit int) {
 		currentTimeout = 0
 	}
 	if s.logger != nil {
-		s.logger.Infof("reload task num[%d / %d]", validNum, fetchedNum)
+		s.logger.Infof("reload task[%d] num[%d / %d]", index, validNum, fetchedNum)
 	}
+}
 
+func (s *server) finish() {
+	defer func() {
+		rerr := recover()
+		if rerr == nil || s.logger == nil {
+			return
+		}
+		s.logger.Infof("remove queue task err: %v, stack: %s", rerr, system.Stack())
+	}()
+	rst, ok := s.st.(role.ReloadStore)
+	if !ok {
+		return
+	}
+	// 标记重载完成
+	rst.End()
+
+	if s.logger != nil {
+		s.logger.Info("remove queue uid start")
+	}
+	wg := &sync.WaitGroup{}
+	wg.Add(s.reloadGN)
+	for index := 0; index < s.reloadGN; index++ {
+		go func() {
+			defer func() {
+				rerr := recover()
+				wg.Done()
+				if rerr == nil || s.logger == nil {
+					return
+				}
+				s.logger.Infof("remove queue task err: %v, stack: %s", rerr, system.Stack())
+			}()
+			maxTimeout := 10
+			currentTimeout := 0
+			for {
+				uid, err := rst.Pop()
+				if err != nil {
+					if !xerror.IsXCode(err, xcode.DBRecordNotFound) {
+						if s.logger != nil {
+							s.logger.Infof("get remove queue task err: %v", err)
+						}
+						if currentTimeout < maxTimeout {
+							currentTimeout++
+						}
+						time.Sleep(s.reloadScale << currentTimeout)
+						continue
+					}
+					break // 无数据正常退出
+				}
+				err = s.st.Remove(uid)
+				if err != nil && s.logger != nil {
+					s.logger.Infof("remove queue task[%d] err: %v", uid, err)
+				}
+				time.Sleep(s.reloadScale)
+			}
+		}()
+	}
+	wg.Wait()
+	if s.logger != nil {
+		s.logger.Info("remove queue uid end")
+	}
 }

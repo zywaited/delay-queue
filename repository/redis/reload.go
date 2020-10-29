@@ -11,22 +11,22 @@ import (
 
 // 只有重启时候才会调用
 type ReloadTask struct {
-	tws *TWStore
+	gls role.GenerateLoseStore
 
 	et int64
 	c  role.PbConvertTask
 }
 
-func NewReload(tws *TWStore, c role.PbConvertTask) *ReloadTask {
+func NewReload(gls role.GenerateLoseStore, c role.PbConvertTask) *ReloadTask {
 	return &ReloadTask{
-		tws: tws,
+		gls: gls,
 		et:  time.Now().UnixNano(),
 		c:   c,
 	}
 }
 
 func (r *ReloadTask) Reload(offset, limit int64) ([]task.Task, error) {
-	mts, err := r.tws.rangeReady(0, r.et, offset, limit)
+	mts, err := r.gls.RangeReady(0, r.et, offset, limit)
 	if err != nil {
 		return nil, errors.WithMessage(err, "reload task error")
 	}
@@ -39,6 +39,6 @@ func (r *ReloadTask) Reload(offset, limit int64) ([]task.Task, error) {
 }
 
 func (r *ReloadTask) Len() (int, error) {
-	l, err := r.tws.readyNum(0, r.et)
+	l, err := r.gls.ReadyNum(0, r.et)
 	return l, errors.WithMessage(err, "reload task error")
 }

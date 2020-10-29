@@ -218,16 +218,23 @@ func (dq *DelayQueue) initStore() error {
 		return errors.New("未知的存储类型")
 	}
 
-	// sorted list server
-	if dq.c.C.Timer.St == string(sorted.ServerName) {
-		// 需要先注入存储
-		store.RegisterHandler(
-			store.SortedListStoreName,
-			store.NewTaskPoolStore(
-				store.NewSortedList(redis.NewSortedSet(dq.c.CB.Redis, dq.store, rcs...)).NewSortedList,
-				store.NewSortedListStoreIterator,
-			).NewTaskStore,
-		)
+	if dq.c.C.Role&uint(role.Timer) == 1 {
+		switch dq.c.C.Timer.St {
+		case string(tw.ServerName):
+			// 重置存储
+			if dq.c.C.DataSource.Dst == inter.RedisStore {
+				dq.store = redis.NewReloadTWStore(dq.store.(*redis.TWStore))
+			}
+		case string(sorted.ServerName):
+			// 需要先注入存储
+			store.RegisterHandler(
+				store.SortedListStoreName,
+				store.NewTaskPoolStore(
+					store.NewSortedList(redis.NewSortedSet(dq.c.CB.Redis, dq.store, rcs...)).NewSortedList,
+					store.NewSortedListStoreIterator,
+				).NewTaskStore,
+			)
+		}
 	}
 
 	// init ready-queue
@@ -356,17 +363,21 @@ func (dq *DelayQueue) reloadServer() error {
 	if dq.timer == nil || runner.AcRunner(runner.DefaultRunnerName) == nil {
 		return errors.New("timer or runner not init")
 	}
-	if _, ok := dq.store.(*redis.TWStore); !ok {
+	if dq.c.C.Timer.St != string(tw.ServerName) {
+		return nil
+	}
+	if _, ok := dq.store.(role.GenerateLoseStore); !ok {
 		return nil
 	}
 	rs := reload.NewServer(
 		reload.ServerConfigWithLogger(dq.c.CB.Logger),
-		reload.ServerConfigWithReload(redis.NewReload(dq.store.(*redis.TWStore), dq.convert)),
+		reload.ServerConfigWithReload(redis.NewReload(dq.store.(role.GenerateLoseStore), dq.convert)),
 		reload.ServerConfigWithReloadGN(dq.c.C.Timer.TimingWheel.ReloadGoNum),
 		reload.ServerConfigWithReloadScale(time.Duration(dq.c.C.Timer.TimingWheel.ReloadConfigScale)*dq.base),
 		reload.ServerConfigWithReloadPerNum(dq.c.C.Timer.TimingWheel.ReloadPerNum),
 		reload.ServerConfigWithTimer(dq.timer),
 		reload.ServerConfigWithRunner(runner.AcRunner(runner.DefaultRunnerName)),
+		reload.ServerConfigWithStore(dq.store),
 	)
 	return pkgerr.WithMessage(rs.Run(), "Reload启动失败")
 }

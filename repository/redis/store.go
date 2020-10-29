@@ -212,6 +212,14 @@ func (ms *MapStore) do(commandName string, args ...interface{}) error {
 	return err
 }
 
+func (ms *MapStore) doV(commandName string, args ...interface{}) (interface{}, error) {
+	c := ms.rp.Get()
+	defer func() {
+		_ = c.Close()
+	}()
+	return c.Do(commandName, args...)
+}
+
 func (ms *MapStore) batch(c redis.Conn, uids []string) ([]*model.Task, error) {
 	return ms.batchWithEmpty(c, uids, nil)
 }

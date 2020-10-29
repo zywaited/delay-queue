@@ -39,6 +39,18 @@ type GenerateLoseTask interface {
 	Reload(int64, int64) ([]task.Task, error)
 }
 
+type GenerateLoseStore interface {
+	RangeReady(int64, int64, int64, int64) ([]*model.Task, error)
+	ReadyNum(int64, int64) (int, error)
+}
+
+type ReloadStore interface {
+	Start()
+	End()
+	Len() int
+	Pop() (string, error)
+}
+
 type DataSourceTransaction interface {
 	Transaction(func(DataStore) error) error
 }

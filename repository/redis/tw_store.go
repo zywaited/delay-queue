@@ -141,7 +141,7 @@ func (tws *TWStore) interRemoveMany(c redis.Conn, uids []string) error {
 	return nil
 }
 
-func (tws *TWStore) rangeReady(st, et, offset, limit int64) ([]*model.Task, error) {
+func (tws *TWStore) RangeReady(st, et, offset, limit int64) ([]*model.Task, error) {
 	c := tws.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -155,25 +155,20 @@ func (tws *TWStore) rangeReady(st, et, offset, limit int64) ([]*model.Task, erro
 		return nil, errors.WithMessage(err, "redis查询当前分值的任务失败")
 	}
 	// 这里处理下空数据
-	emptyUids := make([]string, 0, len(uids))
+	emptyTasks := make([]*model.Task, 0, len(uids))
 	mts, err := tws.batchWithEmpty(c, uids, func(uid string) {
-		emptyUids = append(emptyUids, uid)
+		mt := model.GenerateTask()
+		mt.Uid = uid
+		emptyTasks = append(emptyTasks, mt)
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(emptyUids) == 0 {
-		return mts, nil
-	}
-	// 这里不用事务，删除一个算一个
-	for _, uid := range emptyUids {
-		_ = c.Send("ZREM", tws.absoluteName, uid)
-	}
-	_ = c.Flush()
+	mts = append(mts, emptyTasks...)
 	return mts, nil
 }
 
-func (tws *TWStore) readyNum(st, et int64) (int, error) {
+func (tws *TWStore) ReadyNum(st, et int64) (int, error) {
 	c := tws.rp.Get()
 	defer func() {
 		_ = c.Close()
