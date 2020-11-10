@@ -254,10 +254,9 @@ func (ms *MapStore) batchWithEmpty(c redis.Conn, uids []string, emptyFn func(str
 			}
 			continue
 		}
-		xcopy.WithSource(rt)(cp)
 		t := model.GenerateTask()
 		ts = append(ts, t)
-		if err = cp.CopyF(t); err != nil {
+		if err = cp.SetSource(rt).CopyF(t); err != nil {
 			for _, t = range ts {
 				model.ReleaseTask(t)
 			}
