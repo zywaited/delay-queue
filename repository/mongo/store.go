@@ -61,7 +61,7 @@ func (s *store) Retrieve(uid string) (*model.Task, error) {
 }
 
 func (s *store) Remove(uid string) error {
-	_, err := s.collection.DeleteOne(context.Background(), uid)
+	_, err := s.collection.DeleteOne(context.Background(), bson.M{"uid": uid})
 	return errors.WithMessage(err, "Mongo数据删除失败")
 }
 
@@ -115,19 +115,6 @@ func (s *store) InsertMany(ts []*model.Task) error {
 }
 
 func (s *store) RemoveMany(uids []string) error {
-	// note 代码重复了，后面处理下
-	args := s.ap.Get().([]interface{})
-	if cap(args) < len(uids) {
-		s.ap.Put(args)
-		args = make([]interface{}, 0, len(uids))
-	}
-	defer func() {
-		args = args[:0]
-		s.ap.Put(args)
-	}()
-	for _, uid := range uids {
-		args = append(args, uid)
-	}
-	_, err := s.collection.DeleteMany(context.Background(), args)
+	_, err := s.collection.DeleteMany(context.Background(), bson.M{"uid": bson.M{"$in": uids}})
 	return errors.WithMessage(err, "Mongo数据批量删除失败[RemoveMany]")
 }
