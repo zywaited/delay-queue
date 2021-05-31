@@ -10,8 +10,6 @@ import (
 	"github.com/zywaited/delay-queue/protocol/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 type store struct {
@@ -31,7 +29,8 @@ func NewStore(client *mongo.Client, opts ...ConfigOption) *store {
 			return make([]interface{}, 0, 20) // 先给20字段长度
 		}},
 	}
-	s.db = s.client.Database(s.c.db, options.Database().SetReadPreference(readpref.SecondaryPreferred()))
+	// clint init options.Database().SetReadPreference(readpref.SecondaryPreferred())
+	s.db = s.client.Database(s.c.db)
 	s.collection = s.db.Collection(s.c.collection)
 	return s
 }
