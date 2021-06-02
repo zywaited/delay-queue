@@ -21,7 +21,8 @@ func NewStatusStore(client *mongo.Client, opts ...ConfigOption) *status {
 func (s *status) Status(uid string, tt pb.TaskType) error {
 	_, err := s.store.collection.UpdateOne(
 		context.Background(),
-		bson.M{"uid": uid}, bson.M{"$set": bson.M{"type": int32(tt)}},
+		bson.M{"uid": uid},
+		bson.M{"$set": bson.M{"type": int32(tt)}},
 	)
 	return errors.WithMessage(err, "Mongo数据更新类型状态失败")
 }
@@ -29,7 +30,8 @@ func (s *status) Status(uid string, tt pb.TaskType) error {
 func (s *status) NextTime(uid string, nt *time.Time) error {
 	_, err := s.store.collection.UpdateOne(
 		context.Background(),
-		bson.M{"uid": uid}, bson.M{"$set": bson.M{"next_exec_time": nt.UnixNano()}},
+		bson.M{"uid": uid},
+		bson.M{"$set": bson.M{"next_exec_time": nt.UnixNano()}},
 	)
 	return errors.WithMessage(err, "Mongo数据更新下次执行时间失败")
 }
@@ -37,7 +39,8 @@ func (s *status) NextTime(uid string, nt *time.Time) error {
 func (s *status) IncrRetryTimes(uid string, num int) error {
 	_, err := s.store.collection.UpdateOne(
 		context.Background(),
-		bson.M{"uid": uid}, bson.M{"$inc": bson.M{"retry_times": num}},
+		bson.M{"uid": uid},
+		bson.M{"$inc": bson.M{"retry_times": num}},
 	)
 	return errors.WithMessage(err, "Mongo数据更新重试次数失败")
 }
@@ -45,7 +48,8 @@ func (s *status) IncrRetryTimes(uid string, num int) error {
 func (s *status) IncrSendTimes(uid string, num int) error {
 	_, err := s.store.collection.UpdateOne(
 		context.Background(),
-		bson.M{"uid": uid}, bson.M{"$inc": bson.M{"times": num}},
+		bson.M{"uid": uid},
+		bson.M{"$inc": bson.M{"times": num}},
 	)
 	return errors.WithMessage(err, "Mongo数据更新发送次数失败")
 }

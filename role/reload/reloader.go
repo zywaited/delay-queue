@@ -4,8 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/save95/xerror"
-	"github.com/save95/xerror/xcode"
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role"
 	"github.com/zywaited/delay-queue/role/task"
@@ -89,10 +87,7 @@ func NewServer(opts ...ServerConfigOption) *server {
 }
 
 func (s *server) Run() error {
-	go func() {
-		s.run()
-		s.finish()
-	}()
+	go s.run()
 	return nil
 }
 
@@ -128,14 +123,10 @@ func (s *server) run() {
 			time.Sleep(s.reloadScale)
 		}
 	}
-	// 标记重载开始
-	if rst, ok := s.st.(role.ReloadStore); ok {
-		rst.Start()
-	}
 	if s.logger != nil {
 		s.logger.Infof("reload latest task start: %d", l)
 	}
-	maxNum := l/s.reloadGN + 1
+	maxNum := int(l)/s.reloadGN + 1
 	wg := &sync.WaitGroup{}
 	wg.Add(s.reloadGN)
 	for index := 0; index < s.reloadGN; index++ {
@@ -170,7 +161,7 @@ func (s *server) task(index, maxNum, limit int) {
 		if limit <= 0 {
 			break
 		}
-		ts, err := s.reload.Reload(int64(offset), int64(limit))
+		ts, err := s.reload.Reload()
 		if err != nil {
 			if s.logger == nil {
 				return
@@ -205,66 +196,5 @@ func (s *server) task(index, maxNum, limit int) {
 	}
 	if s.logger != nil {
 		s.logger.Infof("reload task[%d] num[%d / %d]", index, validNum, fetchedNum)
-	}
-}
-
-func (s *server) finish() {
-	defer func() {
-		rerr := recover()
-		if rerr == nil || s.logger == nil {
-			return
-		}
-		s.logger.Infof("remove queue task err: %v, stack: %s", rerr, system.Stack())
-	}()
-	rst, ok := s.st.(role.ReloadStore)
-	if !ok {
-		return
-	}
-	// 标记重载完成
-	rst.End()
-
-	if s.logger != nil {
-		s.logger.Info("remove queue uid start")
-	}
-	wg := &sync.WaitGroup{}
-	wg.Add(s.reloadGN)
-	for index := 0; index < s.reloadGN; index++ {
-		go func() {
-			defer func() {
-				rerr := recover()
-				wg.Done()
-				if rerr == nil || s.logger == nil {
-					return
-				}
-				s.logger.Infof("remove queue task err: %v, stack: %s", rerr, system.Stack())
-			}()
-			maxTimeout := 10
-			currentTimeout := 0
-			for {
-				uid, err := rst.Pop()
-				if err != nil {
-					if !xerror.IsXCode(err, xcode.DBRecordNotFound) {
-						if s.logger != nil {
-							s.logger.Infof("get remove queue task err: %v", err)
-						}
-						if currentTimeout < maxTimeout {
-							currentTimeout++
-						}
-						time.Sleep(s.reloadScale << currentTimeout)
-						continue
-					}
-					break // 无数据正常退出
-				}
-				err = s.st.Remove(uid)
-				if err != nil && s.logger != nil {
-					s.logger.Infof("remove queue task[%d] err: %v", uid, err)
-				}
-				time.Sleep(s.reloadScale)
-			}
-		}()
-	}
-	wg.Wait()
-	if s.logger != nil {
-		s.logger.Info("remove queue uid end")
 	}
 }

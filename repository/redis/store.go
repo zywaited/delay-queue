@@ -3,20 +3,18 @@ package redis
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
 	"github.com/save95/xerror"
 	"github.com/save95/xerror/xcode"
 	"github.com/zywaited/delay-queue/protocol/model"
-	"github.com/zywaited/delay-queue/protocol/pb"
 	"github.com/zywaited/go-common/xcopy"
 )
 
 type Send func(commandName string, args ...interface{}) error
 
-type MapStore struct {
+type mapStore struct {
 	c  *config
 	rp *redis.Pool
 
@@ -25,8 +23,8 @@ type MapStore struct {
 	ap             *sync.Pool
 }
 
-func NewMapStore(rp *redis.Pool, opts ...ConfigOption) *MapStore {
-	ms := &MapStore{
+func NewMapStore(rp *redis.Pool, opts ...ConfigOption) *mapStore {
+	ms := &mapStore{
 		c:  NewConfig(opts...),
 		rp: rp,
 		ap: &sync.Pool{New: func() interface{} {
@@ -41,11 +39,11 @@ func NewMapStore(rp *redis.Pool, opts ...ConfigOption) *MapStore {
 	return ms
 }
 
-func (ms *MapStore) Insert(t *model.Task) error {
+func (ms *mapStore) Insert(t *model.Task) error {
 	return ms.insert(t, ms.do)
 }
 
-func (ms *MapStore) Retrieve(uid string) (*model.Task, error) {
+func (ms *mapStore) Retrieve(uid string) (*model.Task, error) {
 	c := ms.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -68,11 +66,11 @@ func (ms *MapStore) Retrieve(uid string) (*model.Task, error) {
 	return t, nil
 }
 
-func (ms *MapStore) Remove(uid string) error {
+func (ms *mapStore) Remove(uid string) error {
 	return ms.remove(uid, ms.do)
 }
 
-func (ms *MapStore) Batch(uids []string) ([]*model.Task, error) {
+func (ms *mapStore) Batch(uids []string) ([]*model.Task, error) {
 	c := ms.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -80,7 +78,7 @@ func (ms *MapStore) Batch(uids []string) ([]*model.Task, error) {
 	return ms.batch(c, uids)
 }
 
-func (ms *MapStore) InsertMany(ts []*model.Task) error {
+func (ms *mapStore) InsertMany(ts []*model.Task) error {
 	c := ms.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -92,7 +90,7 @@ func (ms *MapStore) InsertMany(ts []*model.Task) error {
 	return errors.WithMessage(c.Flush(), "Redis数据批量写入失败")
 }
 
-func (ms *MapStore) RemoveMany(uids []string) error {
+func (ms *mapStore) RemoveMany(uids []string) error {
 	c := ms.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -105,7 +103,7 @@ func (ms *MapStore) RemoveMany(uids []string) error {
 }
 
 // todo 暂时不生成ID后面有需要再处理
-func (ms *MapStore) generateIds(ts ...*model.Task) error {
+func (ms *mapStore) generateIds(ts ...*model.Task) error {
 	c := ms.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -122,7 +120,7 @@ func (ms *MapStore) generateIds(ts ...*model.Task) error {
 	return nil
 }
 
-func (ms *MapStore) insert(t *model.Task, send Send) error {
+func (ms *mapStore) insert(t *model.Task, send Send) error {
 	args := ms.ap.Get().([]interface{})
 	defer func() {
 		args = args[:0]
@@ -133,14 +131,14 @@ func (ms *MapStore) insert(t *model.Task, send Send) error {
 	return errors.WithMessage(send("HMSET", args...), "Redis数据写入失败[TASK]")
 }
 
-func (ms *MapStore) remove(uid string, send Send) error {
+func (ms *mapStore) remove(uid string, send Send) error {
 	return errors.WithMessage(
 		send("DEL", fmt.Sprintf("%s_%s", ms.absoluteName, uid)),
 		"Redis数据删除失败",
 	)
 }
 
-func (ms *MapStore) removeMany(uids []string, send Send) error {
+func (ms *mapStore) removeMany(uids []string, send Send) error {
 	for _, uid := range uids {
 		if err := ms.remove(uid, send); err != nil {
 			return errors.WithMessage(err, "Redis数据批量删除失败")
@@ -149,7 +147,7 @@ func (ms *MapStore) removeMany(uids []string, send Send) error {
 	return nil
 }
 
-func (ms *MapStore) insertMany(ts []*model.Task, send Send) error {
+func (ms *mapStore) insertMany(ts []*model.Task, send Send) error {
 	for _, t := range ts {
 		if err := ms.insert(t, send); err != nil {
 			return errors.WithMessage(err, "Redis数据批量写入失败")
@@ -158,52 +156,8 @@ func (ms *MapStore) insertMany(ts []*model.Task, send Send) error {
 	return nil
 }
 
-func (ms *MapStore) Status(uid string, tt pb.TaskType) error {
-	// redis数据直接删除即可
-	if tt == pb.TaskType_TaskFinished || tt == pb.TaskType_Ignore {
-		return ms.Remove(uid)
-	}
-	// 只有delay状态要变更
-	if tt == pb.TaskType_TaskDelay {
-		return ms.status(uid, tt, ms.do)
-	}
-	return nil
-}
-
-func (ms *MapStore) status(uid string, tt pb.TaskType, send Send) error {
-	key := fmt.Sprintf("%s_%s", ms.absoluteName, uid)
-	return errors.WithMessage(send("HSET", key, "type", int32(tt)), "Redis数据更新状态失败")
-}
-
-func (ms *MapStore) NextTime(uid string, nt *time.Time) error {
-	return ms.nextTime(uid, nt, ms.do)
-}
-
-func (ms *MapStore) nextTime(uid string, nt *time.Time, send Send) error {
-	key := fmt.Sprintf("%s_%s", ms.absoluteName, uid)
-	return errors.WithMessage(send("HSET", key, "next_exec_time", nt.UnixNano()), "Redis数据更新下次执行时间失败")
-}
-
-func (ms *MapStore) IncrRetryTimes(uid string, num int) error {
-	return ms.incrRetryTimes(uid, num, ms.do)
-}
-
-func (ms *MapStore) incrRetryTimes(uid string, num int, send Send) error {
-	key := fmt.Sprintf("%s_%s", ms.absoluteName, uid)
-	return errors.WithMessage(send("HINCRBY", key, "retry_times", num), "Redis数据更新重试次数失败")
-}
-
-func (ms *MapStore) IncrSendTimes(uid string, num int) error {
-	return ms.incrSendTimes(uid, num, ms.do)
-}
-
-func (ms *MapStore) incrSendTimes(uid string, num int, send Send) error {
-	key := fmt.Sprintf("%s_%s", ms.absoluteName, uid)
-	return errors.WithMessage(send("HINCRBY", key, "times", num), "Redis数据更新发送次数失败")
-}
-
 // 统一封装方便处理
-func (ms *MapStore) do(commandName string, args ...interface{}) error {
+func (ms *mapStore) do(commandName string, args ...interface{}) error {
 	c := ms.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -212,7 +166,7 @@ func (ms *MapStore) do(commandName string, args ...interface{}) error {
 	return err
 }
 
-func (ms *MapStore) doV(commandName string, args ...interface{}) (interface{}, error) {
+func (ms *mapStore) doV(commandName string, args ...interface{}) (interface{}, error) {
 	c := ms.rp.Get()
 	defer func() {
 		_ = c.Close()
@@ -220,11 +174,11 @@ func (ms *MapStore) doV(commandName string, args ...interface{}) (interface{}, e
 	return c.Do(commandName, args...)
 }
 
-func (ms *MapStore) batch(c redis.Conn, uids []string) ([]*model.Task, error) {
+func (ms *mapStore) batch(c redis.Conn, uids []string) ([]*model.Task, error) {
 	return ms.batchWithEmpty(c, uids, nil)
 }
 
-func (ms *MapStore) batchWithEmpty(c redis.Conn, uids []string, emptyFn func(string)) ([]*model.Task, error) {
+func (ms *mapStore) batchWithEmpty(c redis.Conn, uids []string, emptyFn func(string)) ([]*model.Task, error) {
 	for _, uid := range uids {
 		err := c.Send("HGETALL", fmt.Sprintf("%s_%s", ms.absoluteName, uid))
 		if err != nil {

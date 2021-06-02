@@ -13,6 +13,7 @@ import (
 	"github.com/zywaited/delay-queue/role"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // version >= 4.0
@@ -145,7 +146,7 @@ func (lt *lowerTransaction) Transaction(fn func(role.DataStore) error) (err erro
 	if err != nil || len(nt.data) == 0 {
 		return
 	}
-	_, err = lt.status.collection.BulkWrite(context.Background(), nt.data)
+	_, err = lt.status.collection.BulkWrite(context.Background(), nt.data, options.BulkWrite().SetOrdered(false))
 	if err != nil {
 		err = errors.WithMessage(fn(nt), "mongo bulk write 逻辑出错[LowerTransaction]")
 	}

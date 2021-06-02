@@ -34,21 +34,20 @@ type DataStoreUpdater interface {
 
 // 恢复数据时使用
 // 也就时间轮重启会处理该逻辑
+type GeneratePool interface {
+	Generate(int64, int64, int64) GenerateLoseTask
+	Release(GenerateLoseTask)
+}
+
 type GenerateLoseTask interface {
-	Len() (int, error)
-	Reload(int64, int64) ([]task.Task, error)
+	Len() (int64, error)
+	Reload() ([]task.Task, error)
 }
 
 type GenerateLoseStore interface {
-	RangeReady(int64, int64, int64, int64) ([]*model.Task, error)
-	ReadyNum(int64, int64) (int, error)
-}
-
-type ReloadStore interface {
-	Start()
-	End()
-	Len() int
-	Pop() (string, error)
+	RangeReady(int64, int64, int64) ([]*model.Task, error)
+	ReadyNum(int64, int64) (int64, error)
+	NextReady(int64, int64) (int64, error)
 }
 
 type DataSourceTransaction interface {
