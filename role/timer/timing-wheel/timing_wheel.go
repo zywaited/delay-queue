@@ -252,7 +252,7 @@ func (tw *TimeWheel) removeTask(t Task) {
 	}
 	if tw.nextLevel != nil {
 		// 所有内部数据流转都走chanel，保证所有的逻辑一致
-		tw.nextLevel.Remove(t)
+		go tw.nextLevel.Remove(t)
 	}
 }
 

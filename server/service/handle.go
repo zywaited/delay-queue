@@ -166,6 +166,7 @@ func (h *Handle) Add(ctx context.Context, addReq *pb.AddReq) (*pb.AddResp, error
 	c := make(chan error, 1)
 	go func() {
 		c <- h.add(uid, addReq)
+		close(c)
 	}()
 	select {
 	case <-h.acTimeoutC():
@@ -199,6 +200,7 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		}()
 		mt, err = h.store.Retrieve(uid)
 		c <- pkgerr.WithMessage(err, "任务查询失败")
+		close(c)
 	}()
 	select {
 	case <-h.acTimeoutC():
@@ -224,6 +226,7 @@ func (h *Handle) Remove(ctx context.Context, req *pb.RemoveReq) (*empty.Empty, e
 	c := make(chan error, 1)
 	go func() {
 		c <- h.remove(uid)
+		close(c)
 	}()
 	select {
 	case <-h.acTimeoutC():
