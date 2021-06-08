@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/gomodule/redigo/redis"
@@ -59,7 +60,7 @@ func (ms *mapStore) Retrieve(uid string) (*model.Task, error) {
 		return nil, xerror.WithXCodeMessage(xcode.DBRecordNotFound, "Redis任务不存在")
 	}
 	t := model.GenerateTask()
-	if err = ms.c.cp.SetSource(rt).CopySF(t); err != nil {
+	if err = ms.c.cp.CopySF(t, rt); err != nil {
 		model.ReleaseTask(t)
 		return nil, errors.WithMessage(err, "Redis数据协议转换失败[Retrieve]")
 	}
@@ -114,7 +115,7 @@ func (ms *mapStore) generateIds(ts ...*model.Task) error {
 	}
 	sId := id - len(ts) + 1
 	for _, t := range ts {
-		t.Id = uint(sId)
+		t.Id = strconv.Itoa(sId)
 		sId++
 	}
 	return nil
@@ -210,7 +211,7 @@ func (ms *mapStore) batchWithEmpty(c redis.Conn, uids []string, emptyFn func(str
 		}
 		t := model.GenerateTask()
 		ts = append(ts, t)
-		if err = cp.SetSource(rt).CopyF(t); err != nil {
+		if err = cp.CopyF(t, rt); err != nil {
 			for _, t = range ts {
 				model.ReleaseTask(t)
 			}

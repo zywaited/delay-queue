@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/save95/xerror"
-	"github.com/save95/xerror/xcode"
 	"github.com/zywaited/delay-queue/protocol/model"
 	"github.com/zywaited/delay-queue/protocol/pb"
 	"go.mongodb.org/mongo-driver/bson"
@@ -75,25 +73,26 @@ func (gl *generateLoseStore) ReadyNum(st, et int64) (n int64, err error) {
 	return
 }
 
-func (gl *generateLoseStore) NextReady(st, et int64) (int64, error) {
+func (gl *generateLoseStore) NextReady(st, et, limit int64) (int64, error) {
 	ctx := context.Background()
 	r := gl.collection.FindOne(
 		ctx,
 		bson.M{"created_at": bson.M{"$lte": st, "$gte": et}, "type": bson.M{"$not": pb.TaskType_TaskFinished}},
-		options.FindOne().SetSort(bson.D{{"created_at", -1}}),
+		options.FindOne().SetSort(bson.D{{"created_at", 1}, {"_id", 1}}),
+		options.FindOne().SetSkip(limit-1),
 		options.FindOne().SetProjection(bson.D{{"_id", 1}, {"uid", 1}, {"created_at", 1}}),
 	)
 	bs, err := r.DecodeBytes()
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return 0, xerror.WithXCodeMessage(xcode.DBRecordNotFound, "Mongo任务不存在")
+			return et, nil
 		}
 		return 0, errors.WithMessage(err, "Mongo数据获取失败[NextReady]")
 	}
-	max, err := bs.LookupErr()
+	max, err := bs.LookupErr("created_at")
 	if err != nil {
 		if err == bsoncore.ErrElementNotFound {
-			return 0, xerror.WithXCodeMessage(xcode.DBRecordNotFound, "Mongo任务不存在")
+			return et, nil
 		}
 		return 0, errors.WithMessage(err, "Mongo数据获取失败[NextReady]")
 	}

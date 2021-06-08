@@ -5,27 +5,28 @@ import (
 
 	"github.com/zywaited/delay-queue/protocol/pb"
 	"github.com/zywaited/go-common/xcopy"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Task struct {
-	Id uint `json:"id,omitempty" bson:"_id"`
+	Id string `json:"id,omitempty"`
 
-	Uid          string `json:"uid" bson:"uid"`
-	Name         string `json:"name" bson:"name"`
-	Args         string `json:"args" bson:"args"`
-	Type         int32  `json:"type" bson:"type"`
-	Times        int    `json:"times" bson:"times"`                             // 发送次数
-	RetryTimes   int    `json:"retry_times" bson:"retry_times"`                 // 重试次数
-	ExecTime     int64  `json:"exec_time" bson:"exec_time"`                     // 执行时间
-	NextExecTime int64  `json:"next_exec_time,omitempty" bson:"next_exec_time"` // 下次执行时间
+	Uid          string `json:"uid"`
+	Name         string `json:"name"`
+	Args         string `json:"args"`
+	Type         int32  `json:"type"`
+	Times        int    `json:"times"`                    // 发送次数
+	RetryTimes   int    `json:"retry_times"`              // 重试次数
+	ExecTime     int64  `json:"exec_time"`                // 执行时间
+	NextExecTime int64  `json:"next_exec_time,omitempty"` // 下次执行时间
 
-	Schema  string `json:"schema,omitempty" bson:"schema"`
-	Address string `json:"address,omitempty" bson:"address"`
-	Path    string `json:"path,omitempty" bson:"path"`
+	Schema  string `json:"schema,omitempty"`
+	Address string `json:"address,omitempty"`
+	Path    string `json:"path,omitempty"`
 
-	CreatedAt int64 `json:"created_at,omitempty" bson:"created_at"`
-	UpdatedAt int64 `json:"updated_at,omitempty" bson:"updated_at"`
-	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at"`
+	CreatedAt int64 `json:"created_at,omitempty"`
+	UpdatedAt int64 `json:"updated_at,omitempty"`
+	DeletedAt int64 `json:"deleted_at,omitempty"`
 }
 
 func (t *Task) NextDelayTime() time.Duration {
@@ -92,4 +93,37 @@ func (rt RedisTask) Args(args *[]interface{}) {
 		}
 		*args = append(*args, value)
 	}
+}
+
+var emptyPrimitiveObjectID = primitive.ObjectID{}
+
+type MongoTask struct {
+	Id primitive.ObjectID `json:"id,omitempty" bson:"_id" copy:"-"`
+
+	Uid          string `json:"uid" bson:"uid"`
+	Name         string `json:"name" bson:"name"`
+	Args         string `json:"args" bson:"args"`
+	Type         int32  `json:"type" bson:"type"`
+	Times        int    `json:"times" bson:"times"`                             // 发送次数
+	RetryTimes   int    `json:"retry_times" bson:"retry_times"`                 // 重试次数
+	ExecTime     int64  `json:"exec_time" bson:"exec_time"`                     // 执行时间
+	NextExecTime int64  `json:"next_exec_time,omitempty" bson:"next_exec_time"` // 下次执行时间
+
+	Schema  string `json:"schema,omitempty" bson:"schema"`
+	Address string `json:"address,omitempty" bson:"address"`
+	Path    string `json:"path,omitempty" bson:"path"`
+
+	CreatedAt int64 `json:"created_at,omitempty" bson:"created_at"`
+	UpdatedAt int64 `json:"updated_at,omitempty" bson:"updated_at"`
+	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at"`
+}
+
+func (t *Task) ConvertMongoTask(cp xcopy.XCopy, mt *MongoTask) {
+	_ = cp.CopySF(mt, t)
+	mt.Id = emptyPrimitiveObjectID
+}
+
+func (mt *MongoTask) ConvertTask(cp xcopy.XCopy, t *Task) {
+	_ = cp.CopySF(t, mt)
+	t.Id = mt.Id.Hex()
 }

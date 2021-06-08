@@ -38,7 +38,7 @@ type DelayQueue struct {
 	c     *inter.ConfigData
 	store role.DataStore
 	base  time.Duration
-	cp    *xcopy.XCopy
+	cp    xcopy.XCopy
 
 	timer      timer.Scanner
 	convert    role.PbConvertTask

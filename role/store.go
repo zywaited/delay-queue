@@ -47,7 +47,7 @@ type GenerateLoseTask interface {
 type GenerateLoseStore interface {
 	RangeReady(int64, int64, int64) ([]*model.Task, error)
 	ReadyNum(int64, int64) (int64, error)
-	NextReady(int64, int64) (int64, error)
+	NextReady(int64, int64, int64) (int64, error)
 }
 
 type DataSourceTransaction interface {

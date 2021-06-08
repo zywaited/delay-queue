@@ -20,9 +20,8 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/save95/xerror v1.0.0
 	github.com/sirupsen/logrus v1.6.0
-	github.com/stretchr/testify v1.6.1
 	github.com/tebeka/strftime v0.1.4 // indirect
-	github.com/zywaited/go-common/xcopy v0.0.0-20200810113031-970d38c67f3d
+	github.com/zywaited/go-common/xcopy v0.0.0-20210510032228-64a2874dab32
 	go.mongodb.org/mongo-driver v1.5.2
 	golang.org/x/sys v0.0.0-20200515095857-1151b9dac4a9 // indirect
 	google.golang.org/grpc v1.31.0

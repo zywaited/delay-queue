@@ -55,7 +55,7 @@ func HandleOptionWithLogger(logger system.Logger) HandleOption {
 	}
 }
 
-func HandleOptionWithXCopy(c *xcopy.XCopy) HandleOption {
+func HandleOptionWithXCopy(c xcopy.XCopy) HandleOption {
 	return func(h *Handle) {
 		h.cp = c
 	}

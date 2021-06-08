@@ -9,13 +9,13 @@ type config struct {
 	token      string
 	db         string
 	collection string
-	cp         *xcopy.XCopy
+	cp         xcopy.XCopy
 	convert    role.PbConvertTask
 }
 
 type ConfigOption func(*config)
 
-func ConfigWithCopy(cp *xcopy.XCopy) ConfigOption {
+func ConfigWithCopy(cp xcopy.XCopy) ConfigOption {
 	return func(c *config) {
 		c.cp = cp
 	}

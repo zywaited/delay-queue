@@ -3,8 +3,6 @@ package redis
 import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
-	"github.com/save95/xerror"
-	"github.com/save95/xerror/xcode"
 	"github.com/zywaited/delay-queue/protocol/model"
 )
 
@@ -61,17 +59,17 @@ func (gl *generateLoseStore) ReadyNum(st, et int64) (int64, error) {
 	return l, nil
 }
 
-func (gl *generateLoseStore) NextReady(st, et int64) (n int64, err error) {
+func (gl *generateLoseStore) NextReady(st, et, limit int64) (int64, error) {
 	tws := gl.tws
 	c := tws.rp.Get()
 	defer func() {
 		_ = c.Close()
 	}()
-	score, err := redis.Values(c.Do("ZREVRANGEBYSCORE", tws.absoluteName, et, st, "WITHSCORES", "LIMIT", 0, 1))
+	score, err := redis.Values(c.Do("ZRANGEBYSCORE", tws.absoluteName, st, et, "WITHSCORES", "LIMIT", limit-1, 1))
 	if err != nil {
 		// nil
 		if err == redis.ErrNil {
-			return 0, xerror.WithXCodeMessage(xcode.DBRecordNotFound, "redis任务不存在")
+			return et, nil
 		}
 		return 0, errors.WithMessage(err, "redis查询当前分值的任务失败")
 	}
@@ -81,7 +79,7 @@ func (gl *generateLoseStore) NextReady(st, et int64) (n int64, err error) {
 	max, err := redis.Int64(score[1], nil)
 	if err != nil {
 		if err == redis.ErrNil {
-			return 0, xerror.WithXCodeMessage(xcode.DBRecordNotFound, "redis任务不存在")
+			return et, nil
 		}
 		return 0, errors.WithMessage(err, "redis查询当前分值的任务失败")
 	}

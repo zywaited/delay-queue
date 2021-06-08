@@ -32,7 +32,7 @@ type Handle struct {
 	runner   task.Runner
 	baseTime time.Duration
 	logger   system.Logger
-	cp       *xcopy.XCopy
+	cp       xcopy.XCopy
 	ts       transport.TransporterM
 	wait     bool
 }
@@ -211,7 +211,7 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		}
 		pt := &pb.Task{}
 		defer model.ReleaseTask(mt)
-		if err = h.cp.SetSource(mt).CopyF(pt); err != nil {
+		if err = h.cp.CopyF(pt, mt); err != nil {
 			return nil, xerror.Wrap(err, "任务数据协议转换失败")
 		}
 		return pt, nil

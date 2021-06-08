@@ -1,32 +1,44 @@
 package reload
 
 import (
-	"sync"
+	"context"
+	"errors"
 	"time"
 
+	pkerr "github.com/pkg/errors"
+	"github.com/save95/xerror"
+	"github.com/save95/xerror/xcode"
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role"
+	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
 )
 
+var errEmptyTask = errors.New("no valid task")
+
 type (
 	server struct {
-		reload       role.GenerateLoseTask
-		st           role.DataStore
+		gls          role.GenerateLoseStore
+		reload       role.GeneratePool
+		ds           role.DataStore
 		logger       system.Logger
-		reloadGN     int
-		reloadScale  time.Duration
-		reloadPerNum int
 		runner       task.Runner
-
-		sr timer.Scanner
+		sr           timer.Scanner
+		gp           limiter.Pool
+		reloadGN     int
+		reloadPerNum int
+		reloadScale  time.Duration
+		st           int64
+		et           int64
+		wg           chan struct{}
+		rg           chan role.GenerateLoseTask
 	}
 
 	ServerConfigOption func(*server)
 )
 
-func ServerConfigWithReload(r role.GenerateLoseTask) ServerConfigOption {
+func ServerConfigWithReload(r role.GeneratePool) ServerConfigOption {
 	return func(sc *server) {
 		sc.reload = r
 	}
@@ -40,7 +52,9 @@ func ServerConfigWithLogger(logger system.Logger) ServerConfigOption {
 
 func ServerConfigWithReloadGN(gn int) ServerConfigOption {
 	return func(sc *server) {
-		sc.reloadGN = gn
+		if gn > 0 {
+			sc.reloadGN = gn
+		}
 	}
 }
 func ServerConfigWithReloadScale(scale time.Duration) ServerConfigOption {
@@ -51,7 +65,9 @@ func ServerConfigWithReloadScale(scale time.Duration) ServerConfigOption {
 
 func ServerConfigWithReloadPerNum(limit int) ServerConfigOption {
 	return func(sc *server) {
-		sc.reloadPerNum = limit
+		if limit > 0 {
+			sc.reloadPerNum = limit
+		}
 	}
 }
 
@@ -66,9 +82,21 @@ func ServerConfigWithTimer(sr timer.Scanner) ServerConfigOption {
 		sc.sr = sr
 	}
 }
-func ServerConfigWithStore(st role.DataStore) ServerConfigOption {
+func ServerConfigWithStore(ds role.DataStore) ServerConfigOption {
 	return func(sc *server) {
-		sc.st = st
+		sc.ds = ds
+	}
+}
+
+func ServerConfigWithGP(gp limiter.Pool) ServerConfigOption {
+	return func(s *server) {
+		s.gp = gp
+	}
+}
+
+func ServerConfigWithGLS(gls role.GenerateLoseStore) ServerConfigOption {
+	return func(s *server) {
+		s.gls = gls
 	}
 }
 
@@ -79,7 +107,11 @@ const (
 )
 
 func NewServer(opts ...ServerConfigOption) *server {
-	s := &server{reloadGN: defaultReloadGN, reloadPerNum: defaultReloadPerNum}
+	s := &server{
+		reloadGN:     defaultReloadGN,
+		reloadPerNum: defaultReloadPerNum,
+		et:           time.Now().UnixNano(),
+	}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -87,7 +119,7 @@ func NewServer(opts ...ServerConfigOption) *server {
 }
 
 func (s *server) Run() error {
-	go s.run()
+	_ = s.gp.Submit(context.Background(), s.run)
 	return nil
 }
 
@@ -95,19 +127,21 @@ func (s *server) Stop(t role.StopType) error {
 	return nil
 }
 
+func (s *server) init() {
+	s.wg = make(chan struct{}, s.reloadGN)
+	s.rg = make(chan role.GenerateLoseTask, s.reloadGN)
+	for index := 0; index < s.reloadGN; index++ {
+		s.wg <- struct{}{}
+	}
+	s.st = 0
+}
+
 // 直到所有的数据都被写入
 func (s *server) run() {
-	defer func() {
-		rerr := recover()
-		if rerr == nil || s.logger == nil {
-			return
-		}
-		s.logger.Infof("reload latest task err: %v, stack: %s", rerr, system.Stack())
-	}()
 	if s.reload == nil {
 		return
 	}
-	l, err := s.reload.Len()
+	l, err := s.gls.ReadyNum(s.st, s.et)
 	if err != nil {
 		if s.logger != nil {
 			s.logger.Infof("reload latest task err: %v", err)
@@ -126,75 +160,118 @@ func (s *server) run() {
 	if s.logger != nil {
 		s.logger.Infof("reload latest task start: %d", l)
 	}
-	maxNum := int(l)/s.reloadGN + 1
-	wg := &sync.WaitGroup{}
-	wg.Add(s.reloadGN)
-	for index := 0; index < s.reloadGN; index++ {
-		go func(index int) {
-			defer wg.Done()
-			s.task(index, maxNum, s.reloadPerNum)
-		}(index)
-	}
-	wg.Wait()
+	s.init()
+	s.reloadTasks()
 	if s.logger != nil {
 		s.logger.Info("reload latest task end")
 	}
 }
 
-func (s *server) task(index, maxNum, limit int) {
-	defer func() {
-		rerr := recover()
-		if rerr == nil || s.logger == nil {
-			return
-		}
-		s.logger.Infof("reload latest task err: %v, stack: %s", rerr, system.Stack())
-	}()
-	offset := maxNum * index
-	fetchedNum := 0
+func (s *server) reloadTasks() {
 	maxTimeout := 10
 	currentTimeout := 0
-	validNum := 0
+	quitNum := 0
 	for {
-		if maxNum-fetchedNum < limit {
-			limit = maxNum - fetchedNum
-		}
-		if limit <= 0 {
-			break
-		}
-		ts, err := s.reload.Reload()
-		if err != nil {
-			if s.logger == nil {
-				return
+		tk, err := s.getTask()
+		if err != nil && err != errEmptyTask {
+			if s.logger != nil {
+				s.logger.Infof("get task failed: %v", err)
 			}
-			s.logger.Infof("reload latest task err: %v", err)
 			if currentTimeout < maxTimeout {
 				currentTimeout++
 			}
 			time.Sleep(s.reloadScale << currentTimeout)
 			continue
 		}
-		if s.logger != nil {
-			s.logger.Infof("reload task[%d] args[%d - %d], uid-len: %d", index, offset, limit, len(ts))
+		if err == errEmptyTask {
+			// over
+			if quitNum >= s.reloadGN {
+				break
+			}
+			<-s.wg
+			quitNum++
+			continue
 		}
-		offset += limit
-		fetchedNum += limit
-		validNum += len(ts)
-		for _, t := range ts {
-			rt, ok := t.(task.RunnerTask)
+		s.runTask(tk)
+		if quitNum > 0 {
+			quitNum--
+		}
+		time.Sleep(s.reloadScale)
+	}
+}
+
+func (s *server) getChanTask() (t role.GenerateLoseTask, err error) {
+	select {
+	case t = <-s.rg:
+	default:
+		err = errEmptyTask
+	}
+	return
+}
+
+func (s *server) getRemoteTask() (t role.GenerateLoseTask, err error) {
+	if s.st > s.et {
+		err = errEmptyTask
+		return
+	}
+	et, fer := s.gls.NextReady(s.st, s.et, int64(s.reloadPerNum))
+	if fer != nil {
+		if xerror.IsXCode(fer, xcode.DBRecordNotFound) {
+			err = errEmptyTask
+			s.st = s.et + 1
+			return
+		}
+		err = pkerr.WithMessage(fer, "get task failed")
+		return
+	}
+	t = s.reload.Generate(s.st, et, int64(s.reloadPerNum))
+	s.st = et + 1
+	return
+}
+
+func (s *server) getTask() (t role.GenerateLoseTask, err error) {
+	t, _ = s.getChanTask()
+	if t != nil {
+		return
+	}
+	return s.getRemoteTask()
+}
+
+func (s *server) runTask(t role.GenerateLoseTask) {
+	<-s.wg
+	_ = s.gp.Submit(context.Background(), func() {
+		defer func() {
+			s.wg <- struct{}{}
+		}()
+		ts, err := t.Reload()
+		if err != nil {
+			if s.logger != nil {
+				s.logger.Infof("reload latest task err: %v", err)
+			}
+			// reset
+			s.rg <- t
+			return
+		}
+		if len(ts) == 0 {
+			s.reload.Release(t)
+			return
+		}
+		for _, tk := range ts {
+			rt, ok := tk.(task.RunnerTask)
 			if !ok {
 				continue
 			}
 			rt.InitRunner(s.runner)
-			err = s.sr.Add(t)
+			err = s.sr.Add(tk)
 			if err == nil || s.logger == nil {
 				continue
 			}
-			s.logger.Infof("reload latest task[%s] err: %v", t.Uid(), err)
+			s.logger.Infof("reload latest task[%s] err: %v", tk.Uid(), err)
 		}
-		time.Sleep(s.reloadScale)
-		currentTimeout = 0
-	}
-	if s.logger != nil {
-		s.logger.Infof("reload task[%d] num[%d / %d]", index, validNum, fetchedNum)
-	}
+		if s.logger != nil {
+			s.logger.Infof("reload task: %d", len(ts))
+		}
+		// 这里轮换是为了不占用协程时间太久
+		s.rg <- t
+	})
 }
