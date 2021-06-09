@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/zywaited/delay-queue/inter"
+	"github.com/zywaited/delay-queue/role/limiter"
 )
 
 type configInitOption struct {
@@ -46,5 +47,34 @@ func (blo *baseLevelOption) Run(dq *DelayQueue) error {
 }
 
 func (blo *baseLevelOption) Stop(_ *DelayQueue) error {
+	return nil
+}
+
+type poolOption struct {
+}
+
+func NewPoolOption() *poolOption {
+	return &poolOption{}
+}
+
+func (po *poolOption) Run(dq *DelayQueue) error {
+	opts := []limiter.PoolOptions{limiter.PoolOptionsWithLogger(dq.c.CB.Logger)}
+	if dq.c.C.Gp != nil && dq.c.C.Gp.Limit > 0 {
+		opts = append(opts, limiter.PoolOptionsWithLimit(dq.c.C.Gp.Limit))
+	}
+	if dq.c.C.Gp != nil && dq.c.C.Gp.Idle > 0 {
+		opts = append(opts, limiter.PoolOptionsWithIdle(dq.c.C.Gp.Idle))
+	}
+	if dq.c.C.Gp != nil && dq.c.C.Gp.IdleTime > 0 {
+		opts = append(opts, limiter.PoolOptionsWithIdleTime(dq.base*time.Duration(dq.c.C.Gp.IdleTime)))
+	}
+	if dq.c.C.Gp != nil && dq.c.C.Gp.CheckNum > 0 {
+		opts = append(opts, limiter.PoolOptionsWithCheckNum(dq.c.C.Gp.CheckNum))
+	}
+	dq.gp = limiter.NewPool(limiter.NewWorkerArray(), opts...)
+	return nil
+}
+
+func (po *poolOption) Stop(_ *DelayQueue) error {
 	return nil
 }

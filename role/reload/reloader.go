@@ -119,11 +119,11 @@ func NewServer(opts ...ServerConfigOption) *server {
 }
 
 func (s *server) Run() error {
-	_ = s.gp.Submit(context.Background(), s.run)
+	go s.run()
 	return nil
 }
 
-func (s *server) Stop(t role.StopType) error {
+func (s *server) Stop(_ role.StopType) error {
 	return nil
 }
 
@@ -138,6 +138,13 @@ func (s *server) init() {
 
 // 直到所有的数据都被写入
 func (s *server) run() {
+	defer func() {
+		rerr := recover()
+		if rerr == nil || s.logger == nil {
+			return
+		}
+		s.logger.Infof("reload latest task err: %v, stack: %s", rerr, system.Stack())
+	}()
 	if s.reload == nil {
 		return
 	}

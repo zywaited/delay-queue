@@ -1,7 +1,6 @@
 package inter
 
 import (
-	"errors"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -15,7 +14,7 @@ func init() {
 func ConfigDataWithRedis(cd *ConfigData) error {
 	redisConfig := cd.C.Redis
 	if redisConfig == nil {
-		return errors.New("redis's config is error")
+		return nil
 	}
 	// 尝试是否可以连接
 	dial := func() (redis.Conn, error) {

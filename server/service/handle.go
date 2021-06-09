@@ -18,6 +18,7 @@ import (
 	"github.com/zywaited/delay-queue/protocol/model"
 	"github.com/zywaited/delay-queue/protocol/pb"
 	"github.com/zywaited/delay-queue/role"
+	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
 	"github.com/zywaited/delay-queue/transport"
@@ -34,6 +35,7 @@ type Handle struct {
 	logger   system.Logger
 	cp       xcopy.XCopy
 	ts       transport.TransporterM
+	gp       limiter.Pool
 	wait     bool
 }
 
@@ -164,12 +166,13 @@ func (h *Handle) Add(ctx context.Context, addReq *pb.AddReq) (*pb.AddResp, error
 		h.logger.Infof("[%s]generate task uid: %s", traceId, uid)
 	}
 	c := make(chan error, 1)
-	go func() {
+	ctx = h.acTimeoutC(ctx)
+	_ = h.gp.Submit(ctx, func() {
 		c <- h.add(uid, addReq)
 		close(c)
-	}()
+	})
 	select {
-	case <-h.acTimeoutC():
+	case <-ctx.Done():
 		return nil, xerror.WithXCodeMessage(xcode.GatewayTimeout, "任务写入超时")
 	case err := <-c:
 		if err != nil {
@@ -189,7 +192,8 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		mt  *model.Task
 		err error
 	)
-	go func() {
+	ctx = h.acTimeoutC(ctx)
+	_ = h.gp.Submit(ctx, func() {
 		defer func() {
 			if rerr := recover(); rerr != nil {
 				if h.logger != nil {
@@ -201,9 +205,9 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		mt, err = h.store.Retrieve(uid)
 		c <- pkgerr.WithMessage(err, "任务查询失败")
 		close(c)
-	}()
+	})
 	select {
-	case <-h.acTimeoutC():
+	case <-ctx.Done():
 		return nil, xerror.WithXCodeMessage(xcode.GatewayTimeout, "任务查询超时")
 	case err = <-c:
 		if err != nil {
@@ -224,12 +228,13 @@ func (h *Handle) Remove(ctx context.Context, req *pb.RemoveReq) (*empty.Empty, e
 	}
 	uid := strings.TrimSpace(req.Uid)
 	c := make(chan error, 1)
-	go func() {
+	ctx = h.acTimeoutC(ctx)
+	_ = h.gp.Submit(ctx, func() {
 		c <- h.remove(uid)
 		close(c)
-	}()
+	})
 	select {
-	case <-h.acTimeoutC():
+	case <-ctx.Done():
 		return nil, xerror.WithXCodeMessage(xcode.GatewayTimeout, "任务查询超时")
 	case err := <-c:
 		if err != nil {
@@ -239,11 +244,15 @@ func (h *Handle) Remove(ctx context.Context, req *pb.RemoveReq) (*empty.Empty, e
 	}
 }
 
-func (h *Handle) acTimeoutC() (c <-chan time.Time) {
-	if h.timeout > 0 {
-		c = time.NewTimer(h.timeout * h.baseTime).C
+func (h *Handle) acTimeoutC(ctx context.Context) context.Context {
+	if h.timeout <= 0 {
+		return ctx
 	}
-	return
+	_, ok := ctx.Deadline()
+	if !ok {
+		ctx, _ = context.WithTimeout(ctx, h.timeout*h.baseTime)
+	}
+	return ctx
 }
 
 func (h *Handle) remove(uid string) (err error) {

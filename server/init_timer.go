@@ -37,12 +37,14 @@ func (to *timerOption) Run(dq *DelayQueue) error {
 			tw.OptionWithConfigScale(time.Duration(dq.c.C.ConfigScale)*dq.base),
 			tw.OptionWithScaleLevel(time.Duration(dq.c.C.Timer.ConfigScaleLevel)*dq.base),
 			tw.OptionWithNewTaskStore(store.Handler(store.DefaultStoreName)),
+			tw.OptionWithGP(dq.gp),
 		)
 	case string(sorted.ServerName):
 		sr = sorted.NewServer(
 			sorted.ServerConfigWithLogger(dq.c.CB.Logger),
 			sorted.ServerConfigWithScale(time.Duration(dq.c.C.ConfigScale/dq.c.C.Timer.ConfigScaleLevel)*dq.base),
 			sorted.ServerConfigWithStore(store.Handler(store.SortedListStoreName)),
+			sorted.ServerConfigWithGP(dq.gp),
 		)
 	}
 	dq.timer = sr
@@ -98,18 +100,17 @@ func (ro *reloadOption) Run(dq *DelayQueue) error {
 	if dq.c.C.Timer.St != string(tw.ServerName) {
 		return nil
 	}
-	if _, ok := dq.store.(role.GenerateLoseStore); !ok {
-		return nil
-	}
 	rs := reload.NewServer(
 		reload.ServerConfigWithLogger(dq.c.CB.Logger),
-		//reload.ServerConfigWithReload(redis.NewReload(dq.store.(role.GenerateLoseStore), dq.convert)),
+		reload.ServerConfigWithReload(role.NewGeneratePool(dq.reloadStore, dq.convert)),
 		reload.ServerConfigWithReloadGN(dq.c.C.Timer.TimingWheel.ReloadGoNum),
 		reload.ServerConfigWithReloadScale(time.Duration(dq.c.C.Timer.TimingWheel.ReloadConfigScale)*dq.base),
 		reload.ServerConfigWithReloadPerNum(dq.c.C.Timer.TimingWheel.ReloadPerNum),
 		reload.ServerConfigWithTimer(dq.timer),
 		reload.ServerConfigWithRunner(runner.AcRunner(runner.DefaultRunnerName)),
 		reload.ServerConfigWithStore(dq.store),
+		reload.ServerConfigWithGP(dq.gp),
+		reload.ServerConfigWithGLS(dq.reloadStore),
 	)
 	return pkgerr.WithMessage(rs.Run(), "Reload启动失败")
 }

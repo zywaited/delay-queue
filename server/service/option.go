@@ -5,6 +5,7 @@ import (
 
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role"
+	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
 	"github.com/zywaited/delay-queue/transport"
@@ -72,5 +73,11 @@ func HandleOptionTransporters(ts transport.TransporterM) HandleOption {
 func HandleOptionWithWait(wait bool) HandleOption {
 	return func(h *Handle) {
 		h.wait = wait
+	}
+}
+
+func HandleOptionWithGP(gp limiter.Pool) HandleOption {
+	return func(h *Handle) {
+		h.gp = gp
 	}
 }

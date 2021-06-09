@@ -46,7 +46,7 @@ func (s *Server) Add(c *gin.Context) {
 
 func (s *Server) Get(c *gin.Context) {
 	req := &pb.RetrieveReq{}
-	if err := c.ShouldBindJSON(req); err != nil {
+	if err := c.ShouldBindQuery(req); err != nil {
 		c.Status(xcode.RequestParamError.HttpStatus())
 		return
 	}
@@ -61,7 +61,7 @@ func (s *Server) Get(c *gin.Context) {
 
 func (s *Server) Remove(c *gin.Context) {
 	req := &pb.RemoveReq{}
-	if err := c.ShouldBindJSON(req); err != nil {
+	if err := c.ShouldBindQuery(req); err != nil {
 		c.Status(xcode.RequestParamError.HttpStatus())
 		return
 	}

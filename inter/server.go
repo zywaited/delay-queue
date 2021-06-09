@@ -78,10 +78,15 @@ func ConfigDataWithValidatorTimer(cd *ConfigData) error {
 	return pkgerr.WithMessage(err, "timing-wheel's config is error")
 }
 
-const RedisStore = "redis"
+const (
+	RedisStore  = "redis"
+	MongoStore  = "mongo"
+	MemoryStore = "memory"
+)
 
 var validStore = map[string]bool{
 	RedisStore: true,
+	MongoStore: true,
 }
 
 func ConfigDataWithValidatorStore(cd *ConfigData) error {

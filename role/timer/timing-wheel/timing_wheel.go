@@ -1,6 +1,7 @@
 package timing_wheel
 
 import (
+	"context"
 	"errors"
 	"math"
 	"sync/atomic"
@@ -176,7 +177,9 @@ func (tw *TimeWheel) addTask(t Task) {
 		tw.initNextLevel()
 		if tw.nextLevel != nil {
 			// 所有内部数据流转都走chanel，保证所有的逻辑一致
-			go tw.nextLevel.Add(t)
+			_ = tw.c.gp.Submit(context.Background(), func() {
+				tw.nextLevel.Add(t)
+			})
 			return
 		}
 		// 如果达到最大限制，先统一放到当前层中
@@ -190,7 +193,9 @@ func (tw *TimeWheel) addTask(t Task) {
 	pos, circle := tw.getPosAndCircle(tt)
 	// 异步调度导致的时间误差
 	if pos == tw.currentPos {
-		go tw.baseLevel.Add(t)
+		_ = tw.c.gp.Submit(context.Background(), func() {
+			tw.baseLevel.Add(t)
+		})
 		return
 	}
 	t.Index(pos, circle)
@@ -252,7 +257,9 @@ func (tw *TimeWheel) removeTask(t Task) {
 	}
 	if tw.nextLevel != nil {
 		// 所有内部数据流转都走chanel，保证所有的逻辑一致
-		go tw.nextLevel.Remove(t)
+		_ = tw.c.gp.Submit(context.Background(), func() {
+			tw.nextLevel.Remove(t)
+		})
 	}
 }
 
@@ -297,7 +304,9 @@ func (tw *TimeWheel) tick() {
 	}
 	// 这里为了性能分开处理
 	tw.slots[tw.currentPos] = tw.c.newTaskStore()
-	go tw.scanTasks(store)
+	_ = tw.c.gp.Submit(context.Background(), func() {
+		tw.scanTasks(store)
+	})
 }
 
 func (tw *TimeWheel) scanTasks(store task.Store) {
@@ -330,7 +339,7 @@ func (tw *TimeWheel) scanTasks(store task.Store) {
 
 // 统一执行，防止内部崩溃
 func (tw *TimeWheel) runTask(t Task) {
-	go func() {
+	_ = tw.c.gp.Submit(context.Background(), func() {
 		defer func() {
 			if err := recover(); err != nil {
 				tw.c.logger.Errorf("task: %s exec error: %v, stack: %s", t.Uid(), err, system.Stack())
@@ -340,7 +349,7 @@ func (tw *TimeWheel) runTask(t Task) {
 		if err := t.Run(); err != nil && tw.c.logger != nil {
 			tw.c.logger.Infof("task: %s exec error: %s", t.Uid(), err.Error())
 		}
-	}()
+	})
 }
 
 func (tw *TimeWheel) Remove(t Task) {

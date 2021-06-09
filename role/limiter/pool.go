@@ -101,7 +101,7 @@ func NewPool(ws WorkerGroup, opts ...PoolOptions) *pool {
 	p := &pool{
 		ws:       ws,
 		limit:    int32(limit),
-		checkNum: limit,
+		checkNum: int(math.Ceil(float64(limit) * 0.25)),
 		idle:     int(math.Ceil(float64(limit) * 0.25)),
 		idleTime: defaultCheckTime,
 		wt:       make(chan TaskJob, 128),
@@ -139,7 +139,7 @@ func (p *pool) Run() error {
 	}
 }
 
-func (p *pool) Stop(st role.StopType) error {
+func (p *pool) Stop(_ role.StopType) error {
 	for {
 		cv := atomic.LoadInt32(&p.status)
 		if cv == role.StatusGraceFulST {
@@ -257,7 +257,7 @@ func (p *pool) expire() []Worker {
 		return ews
 	}
 	if p.idle > 0 && p.ws.Len() > p.idle {
-		ews = p.ws.Acquire(p.ws.Len() - p.idle)
+		ews = p.ws.Acquire(checkNum)
 	}
 	return ews
 }

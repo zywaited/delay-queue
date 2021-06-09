@@ -16,6 +16,7 @@ type Config struct {
 	Redis       *RedisConnectConfig
 	Services    *ServiceConfig
 	GenerateId  *GenerateIdConfig `toml:"generate_id"`
+	Gp          *GpConfig         `toml:"gp"`
 }
 
 type GenerateIdConfig struct {
@@ -34,6 +35,7 @@ type LogConfig struct {
 type DataSourceConfig struct {
 	Dst   string `valid:"required"` // data source type
 	Redis *RedisStoreConfig
+	Rst   string `toml:"rst"` // ready queue type
 }
 
 type RedisStoreConfig struct {
@@ -57,18 +59,18 @@ type GroupConfig struct {
 }
 
 type WorkerConfig struct {
-	RetryTimes    int  `toml:"retry_times"`
-	MultiNum      uint `toml:"multi_num" valid:"required"`
+	RetryTimes    int `toml:"retry_times"`
 	Timeout       int64
 	RepeatedTimes int64 `toml:"repeated_times"`
 }
 
 type TimingWheelConfig struct {
-	MaxLevel          int   `toml:"max_level" valid:"required"` // 最大层级
-	SlotNum           int   `toml:"slot_num" valid:"required"`
-	ReloadGoNum       int   `toml:"reload_go_num" valid:"required"`
-	ReloadConfigScale int64 `toml:"reload_config_scale" valid:"required"`
-	ReloadPerNum      int   `toml:"reload_per_num" valid:"required"`
+	MaxLevel          int    `toml:"max_level" valid:"required"` // 最大层级
+	SlotNum           int    `toml:"slot_num" valid:"required"`
+	ReloadGoNum       int    `toml:"reload_go_num" valid:"required"`
+	ReloadConfigScale int64  `toml:"reload_config_scale" valid:"required"`
+	ReloadPerNum      int    `toml:"reload_per_num" valid:"required"`
+	ReloadType        string `toml:"reload_type"`
 }
 
 type RedisConnectConfig struct {
@@ -99,4 +101,11 @@ type GRPCServiceConfig struct {
 type ConfigBoot struct {
 	Logger system.Logger
 	Redis  *redis.Pool
+}
+
+type GpConfig struct {
+	Limit    int32
+	Idle     int
+	IdleTime int `toml:"idle_time"`
+	CheckNum int `toml:"check_num"`
 }

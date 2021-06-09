@@ -6,6 +6,7 @@ import (
 	pkgerr "github.com/pkg/errors"
 	"github.com/zywaited/delay-queue/inter"
 	"github.com/zywaited/delay-queue/role"
+	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/runner"
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
@@ -14,10 +15,11 @@ import (
 )
 
 type DelayQueue struct {
-	c     *inter.ConfigData
-	store role.DataStore
-	base  time.Duration
-	cp    xcopy.XCopy
+	c           *inter.ConfigData
+	store       role.DataStore
+	reloadStore role.GenerateLoseStore
+	base        time.Duration
+	cp          xcopy.XCopy
 
 	timer      timer.Scanner
 	convert    role.PbConvertTask
@@ -27,6 +29,7 @@ type DelayQueue struct {
 	timerId    string
 	transports transport.TransporterM
 	opts       []InitOption
+	gp         limiter.Pool
 }
 
 func NewDelayQueue(opts ...InitOption) *DelayQueue {

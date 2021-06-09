@@ -34,6 +34,7 @@ func (to *transportersOption) Run(dq *DelayQueue) error {
 	dq.transports[transport.TransporterType(trgrpc.SendersType)] = trgrpc.NewSender(
 		trgrpc.SenderOptionWithTimeout(timeout),
 		trgrpc.SenderOptionWithLogger(dq.c.CB.Logger),
+		trgrpc.SenderOptionWithGP(dq.gp),
 	)
 	return nil
 }
@@ -60,9 +61,9 @@ func (wo *workerOption) Run(dq *DelayQueue) error {
 		worker.OptionsWithReadyQueue(dq.rq),
 		worker.OptionsWithRepeatedTimes(int(dq.c.C.Worker.RepeatedTimes)),
 		worker.OptionsWithTimeout(time.Duration(dq.c.C.Worker.Timeout)*dq.base),
-		worker.OptionsWithMultiNum(int(dq.c.C.Worker.MultiNum)),
 		worker.OptionsWithRetryTimes(dq.c.C.Worker.RetryTimes),
 		worker.OptionWithTransporters(dq.transports),
+		worker.OptionWithGP(dq.gp),
 	)
 	dq.worker = w
 	return pkgerr.WithMessage(w.Run(), "Worker启动失败")

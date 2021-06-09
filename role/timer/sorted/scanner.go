@@ -1,6 +1,7 @@
 package sorted
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -212,7 +213,7 @@ func (s *server) scanTask() {
 	_, mr := s.store.(task.StoreRemover)
 	for iter.Next() {
 		t := iter.Scan()
-		go func(t task.Task) {
+		_ = s.c.gp.Submit(context.Background(), func() {
 			defer func() {
 				if err := recover(); err != nil && s.c.logger != nil {
 					s.c.logger.Errorf("task: %s exec error: %v, stack: %s", t.Uid(), err, system.Stack())
@@ -234,7 +235,7 @@ func (s *server) scanTask() {
 				_ = s.Remove(t)
 				_ = pt.WaitResult()
 			}
-		}(t)
+		})
 		if mr {
 			uids = append(uids, t.Uid())
 		}
