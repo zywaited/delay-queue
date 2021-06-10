@@ -2,6 +2,7 @@ package server
 
 import (
 	"flag"
+	"math"
 	"time"
 
 	"github.com/zywaited/delay-queue/inter"
@@ -70,6 +71,13 @@ func (po *poolOption) Run(dq *DelayQueue) error {
 	}
 	if dq.c.C.Gp != nil && dq.c.C.Gp.CheckNum > 0 {
 		opts = append(opts, limiter.PoolOptionsWithCheckNum(dq.c.C.Gp.CheckNum))
+	}
+	if dq.c.C.Gp != nil && dq.c.C.Gp.BlockTime != 0 {
+		multi := float64(dq.c.C.Gp.BlockTime)
+		if dq.c.C.Gp.BlockTime < 0 {
+			multi = 1.0 / float64(-dq.c.C.Gp.BlockTime)
+		}
+		opts = append(opts, limiter.PoolOptionsWithBlockTime(time.Duration(math.Ceil(float64(dq.base)*multi))))
 	}
 	dq.gp = limiter.NewPool(limiter.NewWorkerArray(), opts...)
 	return nil

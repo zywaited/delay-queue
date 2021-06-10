@@ -81,19 +81,26 @@ func PoolOptionsWithWorkerCreator(wc WorkerCreator) PoolOptions {
 	}
 }
 
+func PoolOptionsWithBlockTime(t time.Duration) PoolOptions {
+	return func(p *pool) {
+		p.blockTime = t
+	}
+}
+
 type pool struct {
-	ap       *sync.Pool
-	wc       WorkerCreator
-	ws       WorkerGroup
-	logger   system.Logger
-	status   int32
-	running  int32
-	limit    int32
-	checkNum int
-	idle     int
-	wt       chan TaskJob
-	wr       chan Worker
-	idleTime time.Duration
+	ap        *sync.Pool
+	wc        WorkerCreator
+	ws        WorkerGroup
+	logger    system.Logger
+	status    int32
+	running   int32
+	limit     int32
+	checkNum  int
+	idle      int
+	wt        chan TaskJob
+	wr        chan Worker
+	idleTime  time.Duration
+	blockTime time.Duration
 }
 
 func NewPool(ws WorkerGroup, opts ...PoolOptions) *pool {
@@ -187,6 +194,7 @@ func (p *pool) run() {
 		wt  = p.wt
 		ic  = i.C
 		ews workers
+		bc  <-chan time.Time
 	)
 	acquireWs := func() chan<- TaskJob {
 		w := p.acquire()
@@ -224,6 +232,9 @@ func (p *pool) run() {
 		if ews.len() > 0 {
 			ic = nil
 		}
+		if wc != nil {
+			bc = nil
+		}
 		select {
 		case <-ic:
 			ews = p.expire()
@@ -231,6 +242,9 @@ func (p *pool) run() {
 			tj = j
 			wt = nil
 			wc = acquireWs()
+			if wc == nil && p.blockTime > 0 {
+				bc = time.After(p.blockTime)
+			}
 		case wc <- tj:
 			wc = nil
 			tj = nil
@@ -243,6 +257,8 @@ func (p *pool) run() {
 				break
 			}
 			p.ws.Add(w)
+		case <-bc:
+			wc = p.newWorker().(*poolWorker).tasks
 		}
 	}
 }

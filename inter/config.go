@@ -101,10 +101,11 @@ type GRPCServiceConfig struct {
 }
 
 type GpConfig struct {
-	Limit    int32
-	Idle     int
-	IdleTime int `toml:"idle_time"`
-	CheckNum int `toml:"check_num"`
+	Limit     int32
+	Idle      int
+	IdleTime  int `toml:"idle_time"`
+	CheckNum  int `toml:"check_num"`
+	BlockTime int `toml:"block_time"`
 }
 
 type MongoConnectConfig struct {
