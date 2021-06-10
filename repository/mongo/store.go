@@ -26,10 +26,10 @@ func NewStore(client *mongo.Client, opts ...ConfigOption) *store {
 	s := &store{
 		c:      NewConfig(opts...),
 		client: client,
-		ap: &sync.Pool{New: func() interface{} {
-			return &model.MongoTask{}
-		}},
 	}
+	s.ap = &sync.Pool{New: func() interface{} {
+		return &model.MongoTask{Token: s.c.token}
+	}}
 	// clint init options.Database().SetReadPreference(readpref.SecondaryPreferred())
 	s.db = s.client.Database(s.c.db)
 	s.collection = s.db.Collection(s.c.collection)

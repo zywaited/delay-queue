@@ -11,6 +11,7 @@ import (
 type Task struct {
 	Id string `json:"id,omitempty"`
 
+	Score        int64  `json:"score"`
 	Uid          string `json:"uid"`
 	Name         string `json:"name"`
 	Args         string `json:"args"`
@@ -53,7 +54,9 @@ func (t *Task) NextDelayTime() time.Duration {
 type DbTask struct {
 	Id uint `json:"id"`
 
+	Token        string      `json:"token"`
 	Uid          string      `json:"uid"`
+	Score        int64       `json:"score"`
 	Name         string      `json:"name"`
 	Type         pb.TaskType `json:"type"`
 	Times        int         `json:"times"`          // 发送次数
@@ -100,6 +103,8 @@ var emptyPrimitiveObjectID = primitive.ObjectID{}
 type MongoTask struct {
 	Id primitive.ObjectID `json:"id,omitempty" bson:"_id" copy:"-"`
 
+	Score        int64  `json:"score" bson:"score"`
+	Token        string `json:"token" bson:"token"`
 	Uid          string `json:"uid" bson:"uid"`
 	Name         string `json:"name" bson:"name"`
 	Args         string `json:"args" bson:"args"`
@@ -125,5 +130,8 @@ func (t *Task) ConvertMongoTask(cp xcopy.XCopy, mt *MongoTask) {
 
 func (mt *MongoTask) ConvertTask(cp xcopy.XCopy, t *Task) {
 	_ = cp.CopySF(t, mt)
-	t.Id = mt.Id.Hex()
+}
+
+func (mt *MongoTask) Collection() string {
+	return "task"
 }

@@ -82,7 +82,7 @@ func (tws *TWStore) interInsert(c redis.Conn, t *model.Task) error {
 		return err
 	}
 	// 把创建时间写入
-	err = c.Send("ZADD", tws.absoluteName, t.CreatedAt, t.Uid)
+	err = c.Send("ZADD", tws.absoluteName, t.Score, t.Uid)
 	return errors.WithMessage(err, "redis zset 写入失败")
 }
 
@@ -98,7 +98,7 @@ func (tws *TWStore) interInsertMany(c redis.Conn, ts []*model.Task) error {
 		return err
 	}
 	for _, t := range ts {
-		err = c.Send("ZADD", tws.absoluteName, t.CreatedAt, t.Uid)
+		err = c.Send("ZADD", tws.absoluteName, t.Score, t.Uid)
 		if err != nil {
 			return errors.WithMessage(err, "redis zset 批量写入失败")
 		}

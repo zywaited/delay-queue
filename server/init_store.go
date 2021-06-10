@@ -1,9 +1,12 @@
 package server
 
 import (
+	"crypto/md5"
 	"errors"
 
 	"github.com/zywaited/delay-queue/inter"
+	"github.com/zywaited/delay-queue/protocol/model"
+	"github.com/zywaited/delay-queue/repository/mongo"
 	"github.com/zywaited/delay-queue/repository/redis"
 	"github.com/zywaited/delay-queue/role"
 	"github.com/zywaited/delay-queue/role/runner"
@@ -23,6 +26,7 @@ func NewStoreOption() *storeOption {
 	so.ids = map[string]InitStoreFunc{
 		"":               so.initNotValidDataSource,
 		inter.RedisStore: so.initRedisDataSource,
+		inter.MongoStore: so.initMongoDataSource,
 	}
 	so.its = map[string]InitStoreFunc{
 		"":                        so.initEmptyTimerStore,
@@ -51,6 +55,31 @@ func (so *storeOption) initRedisDataSource(dq *DelayQueue) error {
 	)
 	dq.store = tws
 	dq.reloadStore = redis.NewGenerateLoseStore(tws)
+	return nil
+}
+
+func (so *storeOption) initMongoDataSource(dq *DelayQueue) error {
+	if dq.c.CB.Mongo.Client == nil {
+		return errors.New("mongo未初始化")
+	}
+	// 对timerId做MD5
+	m := md5.New()
+	m.Write([]byte(dq.timerId))
+	token := string(m.Sum(nil))
+	opts := []mongo.ConfigOption{
+		mongo.ConfigWithCopy(dq.cp),
+		mongo.ConfigWithConvert(dq.convert),
+		mongo.ConfigWithToken(token),
+		mongo.ConfigWithDb(dq.c.C.Mongo.DbName),
+		mongo.ConfigWithCollection((&model.MongoTask{}).Collection()),
+	}
+	dq.reloadStore = mongo.NewGenerateLoseStore(dq.c.CB.Mongo.Client, opts...)
+	if dq.c.CB.Mongo.Version < 4 {
+		// note: 全局都是修改操作，这里用bulk write也不会有问题
+		dq.store = mongo.NewLowerTransactionStore(dq.c.CB.Mongo.Client, opts...)
+		return nil
+	}
+	dq.store = mongo.NewTransactionStore(dq.c.CB.Mongo.Client, opts...)
 	return nil
 }
 

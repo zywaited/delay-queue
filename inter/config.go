@@ -3,6 +3,7 @@ package inter
 import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/zywaited/delay-queue/parser/system"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Config struct {
@@ -14,6 +15,7 @@ type Config struct {
 	Worker      *WorkerConfig
 	Log         *LogConfig
 	Redis       *RedisConnectConfig
+	Mongo       *MongoConnectConfig
 	Services    *ServiceConfig
 	GenerateId  *GenerateIdConfig `toml:"generate_id"`
 	Gp          *GpConfig         `toml:"gp"`
@@ -98,14 +100,28 @@ type GRPCServiceConfig struct {
 	Addr string
 }
 
-type ConfigBoot struct {
-	Logger system.Logger
-	Redis  *redis.Pool
-}
-
 type GpConfig struct {
 	Limit    int32
 	Idle     int
 	IdleTime int `toml:"idle_time"`
 	CheckNum int `toml:"check_num"`
+}
+
+type MongoConnectConfig struct {
+	Uri             string `toml:"uri"`                // uri
+	DbName          string `toml:"db_name"`            // 数据库名字
+	MaxPoolSize     uint64 `toml:"max_pool_size"`      // 最大连接数
+	ConnectTimeout  uint64 `toml:"connect_timeout"`    // 连接超时时间, 毫秒
+	MaxConnIdleTime uint64 `toml:"max_conn_idle_time"` // 连接空闲时间,毫秒
+}
+
+type ConfigBoot struct {
+	Logger system.Logger
+	Redis  *redis.Pool
+	Mongo  MongoInfo
+}
+
+type MongoInfo struct {
+	Client  *mongo.Client
+	Version int // 只考虑大版本
 }

@@ -100,6 +100,18 @@ func ServerConfigWithGLS(gls role.GenerateLoseStore) ServerConfigOption {
 	}
 }
 
+func ServerConfigWithST(st int64) ServerConfigOption {
+	return func(s *server) {
+		s.st = st
+	}
+}
+
+func ServerConfigWithET(et int64) ServerConfigOption {
+	return func(s *server) {
+		s.et = et
+	}
+}
+
 // 默认加载数量
 const (
 	defaultReloadGN     = 1
@@ -110,7 +122,7 @@ func NewServer(opts ...ServerConfigOption) *server {
 	s := &server{
 		reloadGN:     defaultReloadGN,
 		reloadPerNum: defaultReloadPerNum,
-		et:           time.Now().UnixNano(),
+		et:           time.Now().UnixNano(), // 这里不应该是时间戳了
 	}
 	for _, opt := range opts {
 		opt(s)

@@ -78,7 +78,7 @@ func (rt *generateLoseTask) Reload() ([]task.Task, error) {
 	}
 	ts := make([]task.Task, 0, len(mts))
 	for _, mt := range mts {
-		rt.st = mt.CreatedAt + 1
+		rt.st = mt.Score + 1
 		ts = append(ts, rt.c.Convert(mt))
 		model.ReleaseTask(mt)
 	}
