@@ -6,11 +6,11 @@ import (
 	pkgerr "github.com/pkg/errors"
 	"github.com/zywaited/delay-queue/inter"
 	"github.com/zywaited/delay-queue/role"
-	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/runner"
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
 	"github.com/zywaited/delay-queue/transport"
+	"github.com/zywaited/go-common/limiter"
 	"github.com/zywaited/go-common/xcopy"
 )
 

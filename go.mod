@@ -21,6 +21,7 @@ require (
 	github.com/save95/xerror v1.0.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/tebeka/strftime v0.1.4 // indirect
+	github.com/zywaited/go-common/limiter v0.0.0-20210611024247-e1f77fda8cfc
 	github.com/zywaited/go-common/xcopy v0.0.0-20210510032228-64a2874dab32
 	go.mongodb.org/mongo-driver v1.5.2
 	golang.org/x/sys v0.0.0-20200515095857-1151b9dac4a9 // indirect

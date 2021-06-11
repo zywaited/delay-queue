@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/zywaited/delay-queue/parser/system"
-	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/task"
+	"github.com/zywaited/go-common/limiter"
 )
 
 type (

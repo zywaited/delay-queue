@@ -13,7 +13,7 @@ import (
 	mgrpc "github.com/zywaited/delay-queue/middleware/grpc"
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/protocol/pb"
-	"github.com/zywaited/delay-queue/role/limiter"
+	"github.com/zywaited/go-common/limiter"
 	"google.golang.org/grpc"
 )
 

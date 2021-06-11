@@ -10,9 +10,9 @@ import (
 	"github.com/save95/xerror/xcode"
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role"
-	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
+	"github.com/zywaited/go-common/limiter"
 )
 
 var errEmptyTask = errors.New("no valid task")

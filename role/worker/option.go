@@ -5,9 +5,9 @@ import (
 
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role"
-	"github.com/zywaited/delay-queue/role/limiter"
 	"github.com/zywaited/delay-queue/role/runner"
 	"github.com/zywaited/delay-queue/transport"
+	"github.com/zywaited/go-common/limiter"
 )
 
 type option struct {

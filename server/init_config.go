@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/zywaited/delay-queue/inter"
-	"github.com/zywaited/delay-queue/role/limiter"
+	"github.com/zywaited/go-common/limiter"
 )
 
 type configInitOption struct {
