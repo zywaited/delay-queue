@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	pkgerr "github.com/pkg/errors"
 	"github.com/zywaited/delay-queue/inter"
 	"github.com/zywaited/go-common/limiter"
 )
@@ -79,8 +80,9 @@ func (po *poolOption) Run(dq *DelayQueue) error {
 		}
 		opts = append(opts, limiter.PoolOptionsWithBlockTime(time.Duration(math.Ceil(float64(dq.base)*multi))))
 	}
-	dq.gp = limiter.NewPool(limiter.NewWorkerArray(), opts...)
-	return nil
+	gp := limiter.NewPool(limiter.NewWorkerArray(), opts...)
+	dq.gp = gp
+	return pkgerr.WithMessage(gp.Run(), "Pool启动失败")
 }
 
 func (po *poolOption) Stop(_ *DelayQueue) error {
