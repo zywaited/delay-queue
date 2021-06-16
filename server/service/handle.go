@@ -26,17 +26,18 @@ import (
 )
 
 type Handle struct {
-	store    role.DataStore
-	timer    timer.Scanner
-	tp       task.Factory
-	timeout  time.Duration
-	runner   task.Runner
-	baseTime time.Duration
-	logger   system.Logger
-	cp       xcopy.XCopy
-	ts       transport.TransporterM
-	gp       limiter.Pool
-	wait     bool
+	store     role.DataStore
+	timer     timer.Scanner
+	tp        task.Factory
+	timeout   time.Duration
+	runner    task.Runner
+	baseTime  time.Duration
+	logger    system.Logger
+	cp        xcopy.XCopy
+	ts        transport.TransporterM
+	gp        limiter.Pool
+	idCreator role.GenerateIds
+	wait      bool
 }
 
 func NewHandle(opts ...HandleOption) *Handle {
@@ -71,7 +72,7 @@ func (h *Handle) generateId(addReq *pb.AddReq) string {
 	return hex.EncodeToString(mh.Sum([]byte("med-delay-queue")))
 }
 
-func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
+func (h *Handle) add(ctx context.Context, uid string, addReq *pb.AddReq) (err error) {
 	defer func() {
 		if rerr := recover(); rerr != nil {
 			if h.logger != nil {
@@ -107,6 +108,10 @@ func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
 	if err != nil {
 		// 该分支代表已经写入存储，但未入队列
 		mt := model.GenerateTask()
+		mt.Score, err = h.idCreator.Id(ctx)
+		if err != nil {
+			return pkgerr.WithMessage(err, "score 生成失败")
+		}
 		mt.Uid = uid
 		mt.Name = strings.TrimSpace(addReq.Name)
 		mt.Args = strings.TrimSpace(addReq.Args)
@@ -168,7 +173,7 @@ func (h *Handle) Add(ctx context.Context, addReq *pb.AddReq) (*pb.AddResp, error
 	c := make(chan error, 1)
 	ctx = h.acTimeoutC(ctx)
 	_ = h.gp.Submit(ctx, func() {
-		c <- h.add(uid, addReq)
+		c <- h.add(ctx, uid, addReq)
 		close(c)
 	})
 	select {
@@ -248,8 +253,8 @@ func (h *Handle) acTimeoutC(ctx context.Context) context.Context {
 	if h.timeout <= 0 {
 		return ctx
 	}
-	_, ok := ctx.Deadline()
-	if !ok {
+	dt, ok := ctx.Deadline()
+	if !ok || dt.Sub(time.Now()) > h.timeout*h.baseTime {
 		ctx, _ = context.WithTimeout(ctx, h.timeout*h.baseTime)
 	}
 	return ctx

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -100,6 +101,11 @@ func (ro *reloadOption) Run(dq *DelayQueue) error {
 	if dq.c.C.Timer.St != string(tw.ServerName) {
 		return nil
 	}
+	// 这里会间接废弃一个id
+	nextId, err := dq.idCreator.Id(context.Background())
+	if err != nil {
+		return pkgerr.WithMessage(err, "Reload初始化失败")
+	}
 	rs := reload.NewServer(
 		reload.ServerConfigWithLogger(dq.c.CB.Logger),
 		reload.ServerConfigWithReload(role.NewGeneratePool(dq.reloadStore, dq.convert)),
@@ -111,6 +117,7 @@ func (ro *reloadOption) Run(dq *DelayQueue) error {
 		reload.ServerConfigWithStore(dq.store),
 		reload.ServerConfigWithGP(dq.gp),
 		reload.ServerConfigWithGLS(dq.reloadStore),
+		reload.ServerConfigWithET(nextId),
 	)
 	return pkgerr.WithMessage(rs.Run(), "Reload启动失败")
 }

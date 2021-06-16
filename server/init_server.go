@@ -45,6 +45,7 @@ func (po *protocolOption) runProtocol(dq *DelayQueue) error {
 		service.HandleOptionTransporters(dq.transports),
 		service.HandleOptionWithWait(dq.c.C.Services.Wait),
 		service.HandleOptionWithGP(dq.gp),
+		service.HandleOptionWithIdCreator(dq.idCreator),
 	)
 	c := make(chan error)
 	defer close(c)

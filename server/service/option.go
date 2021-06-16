@@ -81,3 +81,9 @@ func HandleOptionWithGP(gp limiter.Pool) HandleOption {
 		h.gp = gp
 	}
 }
+
+func HandleOptionWithIdCreator(version role.GenerateIds) HandleOption {
+	return func(h *Handle) {
+		h.idCreator = version
+	}
+}

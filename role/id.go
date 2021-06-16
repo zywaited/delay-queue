@@ -1,15 +1,10 @@
 package role
 
-type GenerateId func() (string, string)
+import "context"
 
-type GenerateIdType string
-
-var generateIds GenerateId
-
-func AcGenerateId() GenerateId {
-	return generateIds
-}
-
-func RegisterGenerateId(gi GenerateId) {
-	generateIds = gi
+type GenerateIds interface {
+	Launcher
+	Timer(context.Context) (string, error)
+	Worker(context.Context) (string, error)
+	Id(context.Context) (int64, error)
 }

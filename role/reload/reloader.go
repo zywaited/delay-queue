@@ -180,19 +180,20 @@ func (s *server) run() {
 		s.logger.Infof("reload latest task start: %d", l)
 	}
 	s.init()
-	s.reloadTasks()
+	s.reloadTasks(false)
 	if s.logger != nil {
 		s.logger.Info("reload latest task end")
 	}
+	s.reloadTasks(s.st <= s.et)
 }
 
-func (s *server) reloadTasks() {
+func (s *server) reloadTasks(loop bool) {
 	maxTimeout := 10
 	currentTimeout := 0
 	quitNum := 0
 	for {
 		tk, err := s.getTask()
-		if err != nil && err != errEmptyTask {
+		if err != nil && (err != errEmptyTask || loop) {
 			if s.logger != nil {
 				s.logger.Infof("get task failed: %v", err)
 			}
@@ -205,7 +206,10 @@ func (s *server) reloadTasks() {
 		if err == errEmptyTask {
 			// over
 			if quitNum >= s.reloadGN {
-				break
+				if !loop {
+					break
+				}
+				continue
 			}
 			<-s.wg
 			quitNum++
@@ -237,7 +241,6 @@ func (s *server) getRemoteTask() (t role.GenerateLoseTask, err error) {
 	if fer != nil {
 		if xerror.IsXCode(fer, xcode.DBRecordNotFound) {
 			err = errEmptyTask
-			s.st = s.et + 1
 			return
 		}
 		err = pkerr.WithMessage(fer, "get task failed")

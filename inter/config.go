@@ -25,6 +25,15 @@ type GenerateIdConfig struct {
 	Type    string
 	Timeout int64
 	Group   *GroupConfig
+	Redis   *RedisGenerateIdConfig
+}
+
+type RedisGenerateIdConfig struct {
+	Prefix    string
+	CacheNum  int    `toml:"cache_num"`
+	ValidTime int    `toml:"valid_time"`
+	CheckTime int    `toml:"check_time"`
+	HashKey   string `toml:"hash_key"`
 }
 
 type LogConfig struct {

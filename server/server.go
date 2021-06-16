@@ -30,6 +30,9 @@ type DelayQueue struct {
 	transports transport.TransporterM
 	opts       []InitOption
 	gp         limiter.Pool
+	idCreator  role.GenerateIds
+
+	exit func()
 }
 
 func NewDelayQueue(opts ...InitOption) *DelayQueue {
