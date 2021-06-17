@@ -42,6 +42,8 @@ type GeneratePool interface {
 type GenerateLoseTask interface {
 	Len() (int64, error)
 	Reload() ([]task.Task, error)
+	Next() int64
+	Valid() bool
 }
 
 type GenerateLoseStore interface {

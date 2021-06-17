@@ -3,6 +3,7 @@ package reload
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	pkerr "github.com/pkg/errors"
@@ -31,6 +32,7 @@ type (
 		reloadScale  time.Duration
 		maxCheckTime time.Duration
 		st           int64
+		lt           int64
 		et           int64
 		wg           chan struct{}
 		rg           chan role.GenerateLoseTask
@@ -190,7 +192,7 @@ func (s *server) run() {
 
 func (s *server) reloadTasks() {
 	var tc <-chan time.Time
-	maxTimeout := 10
+	maxTimeout := 5
 	currentTimeout := 0
 	quitNum := s.reloadGN
 	sleep := func(reset bool) {
@@ -227,12 +229,14 @@ func (s *server) reloadTasks() {
 			default:
 			}
 			sleep(false)
-			s.st -= s.et + 1
+			s.st = s.lt
 			continue
 		}
-		s.wg <- struct{}{}
+		if quitNum > 0 {
+			s.wg <- struct{}{}
+			quitNum--
+		}
 		s.runTask(tk)
-		quitNum--
 		sleep(true)
 	}
 }
@@ -255,7 +259,7 @@ func (s *server) getRemoteTask() (t role.GenerateLoseTask, err error) {
 	if fer != nil {
 		if xerror.IsXCode(fer, xcode.DBRecordNotFound) {
 			err = errEmptyTask
-			s.st += s.et + 1
+			s.st = s.et + 1
 			return
 		}
 		err = pkerr.WithMessage(fer, "get task failed")
@@ -308,7 +312,20 @@ func (s *server) runTask(t role.GenerateLoseTask) {
 		if s.logger != nil {
 			s.logger.Infof("reload task: %d", len(ts))
 		}
-		// 这里轮换是为了不占用协程时间太久
-		s.rg <- t
+		// 记录最大的值
+		maxLast := t.Next()
+		for {
+			currentLast := atomic.LoadInt64(&s.lt)
+			if maxLast <= currentLast {
+				break
+			}
+			if atomic.CompareAndSwapInt64(&s.lt, currentLast, maxLast) {
+				break
+			}
+		}
+		if t.Valid() {
+			// 这里轮换是为了不占用协程时间太久
+			s.rg <- t
+		}
 	})
 }

@@ -72,17 +72,32 @@ func (rt *generateLoseTask) Len() (int64, error) {
 }
 
 func (rt *generateLoseTask) Reload() ([]task.Task, error) {
+	var ts []task.Task
+	if rt.st > rt.et {
+		return ts, nil
+	}
 	mts, err := rt.gls.RangeReady(rt.st, rt.et, rt.limit)
 	if err != nil {
 		return nil, errors.WithMessage(err, "reload task error")
 	}
-	ts := make([]task.Task, 0, len(mts))
+	ts = make([]task.Task, 0, len(mts))
 	for _, mt := range mts {
 		rt.st = mt.Score + 1
 		ts = append(ts, rt.c.Convert(mt))
 		model.ReleaseTask(mt)
 	}
+	if len(ts) == 0 {
+		rt.st = rt.et + 1
+	}
 	return ts, nil
+}
+
+func (rt *generateLoseTask) Next() int64 {
+	return rt.st
+}
+
+func (rt *generateLoseTask) Valid() bool {
+	return rt.st <= rt.et
 }
 
 type generatePool struct {

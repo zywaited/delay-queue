@@ -74,7 +74,7 @@ func (gl *generateLoseStore) NextReady(st, et, limit int64) (int64, error) {
 		return 0, errors.WithMessage(err, "redis查询当前分值的任务失败")
 	}
 	if len(score) < 2 {
-		return 0, errors.WithMessage(err, "redis查询当前分值的任务失败")
+		return et, nil
 	}
 	max, err := redis.Int64(score[1], nil)
 	if err != nil {
