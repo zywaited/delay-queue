@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"math"
 	"time"
 
 	pkgerr "github.com/pkg/errors"
@@ -106,11 +107,15 @@ func (ro *reloadOption) Run(dq *DelayQueue) error {
 	if err != nil {
 		return pkgerr.WithMessage(err, "Reload初始化失败")
 	}
+	reloadScale := float64(dq.c.C.Timer.TimingWheel.ReloadConfigScale)
+	if dq.c.C.Timer.TimingWheel.ReloadConfigScale < 0 {
+		reloadScale = 1.0 / float64(-dq.c.C.Timer.TimingWheel.ReloadConfigScale)
+	}
 	rs := reload.NewServer(
 		reload.ServerConfigWithLogger(dq.c.CB.Logger),
 		reload.ServerConfigWithReload(role.NewGeneratePool(dq.reloadStore, dq.convert)),
 		reload.ServerConfigWithReloadGN(dq.c.C.Timer.TimingWheel.ReloadGoNum),
-		reload.ServerConfigWithReloadScale(time.Duration(dq.c.C.Timer.TimingWheel.ReloadConfigScale)*dq.base),
+		reload.ServerConfigWithReloadScale(time.Duration(math.Ceil(reloadScale*float64(dq.base)))),
 		reload.ServerConfigWithMaxCheckTime(time.Duration(dq.c.C.Timer.TimingWheel.MaxCheckTime)*time.Second),
 		reload.ServerConfigWithReloadPerNum(dq.c.C.Timer.TimingWheel.ReloadPerNum),
 		reload.ServerConfigWithTimer(dq.timer),
