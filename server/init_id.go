@@ -89,6 +89,9 @@ func (io *currentIdOption) redisIdVersion(dq *DelayQueue) (role.GenerateIds, err
 	if dq.c.C.GenerateId.Redis != nil && dq.c.C.GenerateId.Redis.ValidTime > 0 {
 		opts = append(opts, id.OptionsWithValidTime(dq.c.C.GenerateId.Redis.ValidTime))
 	}
+	if dq.c.C.GenerateId.Redis != nil && dq.c.C.GenerateId.Redis.MaxLostNum > 0 {
+		opts = append(opts, id.OptionsWithMaxLostNum(dq.c.C.GenerateId.Redis.MaxLostNum))
+	}
 	return id.NewRedisId(dq.c.CB.Redis, opts...), nil
 }
 

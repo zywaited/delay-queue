@@ -17,6 +17,7 @@ import (
 const (
 	internalTime = time.Millisecond * 10
 	validTime    = 5
+	maxLostNum   = 5
 )
 
 type redisId struct {
@@ -351,11 +352,16 @@ return -1
 			return
 		case <-lt.C:
 		}
+		currentNum := 0
 		for {
 			success := lease()
 			if success == 0 {
-				time.Sleep(r.op.internalTime)
-				continue
+				if currentNum < r.op.maxLostNum {
+					time.Sleep(r.op.internalTime << currentNum)
+					currentNum++
+					continue
+				}
+				success = -1
 			}
 			if success < 0 {
 				if r.op.logger != nil {

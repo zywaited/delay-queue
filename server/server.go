@@ -1,6 +1,8 @@
 package server
 
 import (
+	"os"
+	"os/signal"
 	"time"
 
 	pkgerr "github.com/pkg/errors"
@@ -33,13 +35,20 @@ type DelayQueue struct {
 	idCreator  role.GenerateIds
 
 	exit func()
+	ec   chan struct{}
 }
 
 func NewDelayQueue(opts ...InitOption) *DelayQueue {
-	return &DelayQueue{cp: xcopy.NewCopy(), opts: opts}
+	return &DelayQueue{cp: xcopy.NewCopy(), opts: opts, ec: make(chan struct{}, 1)}
 }
 
 func (dq *DelayQueue) Run() error {
+	dq.exit = func() {
+		select {
+		case dq.ec <- struct{}{}:
+		default:
+		}
+	}
 	dq.convert = role.NewDefaultPbConvertTask(task.AcTaskPoolFactory(task.DefaultTaskPoolFactory))
 	for _, opt := range dq.opts {
 		err := opt.Run(dq)
@@ -48,8 +57,25 @@ func (dq *DelayQueue) Run() error {
 		}
 	}
 	// loop
-	// todo 后续加入信号监听
-	select {}
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc)
+	select {
+	case <-dq.ec:
+		if dq.c.CB.Logger != nil {
+			dq.c.CB.Logger.Info("服务管道终止")
+		}
+	case <-sc:
+		if dq.c.CB.Logger != nil {
+			dq.c.CB.Logger.Info("服务信号终止")
+		}
+	}
+	for _, opt := range dq.opts {
+		err := opt.Stop(dq)
+		if err != nil {
+			return pkgerr.WithMessage(err, "服务停止失败")
+		}
+	}
+	return nil
 }
 
 func (dq *DelayQueue) Stop(_ role.StopType) error {

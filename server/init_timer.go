@@ -111,6 +111,7 @@ func (ro *reloadOption) Run(dq *DelayQueue) error {
 		reload.ServerConfigWithReload(role.NewGeneratePool(dq.reloadStore, dq.convert)),
 		reload.ServerConfigWithReloadGN(dq.c.C.Timer.TimingWheel.ReloadGoNum),
 		reload.ServerConfigWithReloadScale(time.Duration(dq.c.C.Timer.TimingWheel.ReloadConfigScale)*dq.base),
+		reload.ServerConfigWithMaxCheckTime(time.Duration(dq.c.C.Timer.TimingWheel.MaxCheckTime)*time.Second),
 		reload.ServerConfigWithReloadPerNum(dq.c.C.Timer.TimingWheel.ReloadPerNum),
 		reload.ServerConfigWithTimer(dq.timer),
 		reload.ServerConfigWithRunner(runner.AcRunner(runner.DefaultRunnerName)),

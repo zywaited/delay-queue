@@ -20,12 +20,13 @@ type option struct {
 	hash         string
 	validTime    int
 	checkTime    int
+	maxLostNum   int
 	internalTime time.Duration
 	cacheNum     int64
 }
 
 func NewOption(opts ...Options) *option {
-	op := &option{}
+	op := &option{maxLostNum: maxLostNum}
 	for _, opt := range opts {
 		opt(op)
 	}
@@ -77,6 +78,12 @@ func OptionsWithValidTime(t int) Options {
 func OptionsWithCheckTime(t int) Options {
 	return func(op *option) {
 		op.checkTime = t
+	}
+}
+
+func OptionsWithMaxLostNum(num int) Options {
+	return func(op *option) {
+		op.maxLostNum = num
 	}
 }
 

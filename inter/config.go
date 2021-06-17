@@ -29,11 +29,12 @@ type GenerateIdConfig struct {
 }
 
 type RedisGenerateIdConfig struct {
-	Prefix    string
-	CacheNum  int    `toml:"cache_num"`
-	ValidTime int    `toml:"valid_time"`
-	CheckTime int    `toml:"check_time"`
-	HashKey   string `toml:"hash_key"`
+	Prefix     string
+	CacheNum   int    `toml:"cache_num"`
+	ValidTime  int    `toml:"valid_time"`
+	CheckTime  int    `toml:"check_time"`
+	HashKey    string `toml:"hash_key"`
+	MaxLostNum int    `toml:"max_lost_num"`
 }
 
 type LogConfig struct {
@@ -82,6 +83,7 @@ type TimingWheelConfig struct {
 	ReloadConfigScale int64  `toml:"reload_config_scale" valid:"required"`
 	ReloadPerNum      int    `toml:"reload_per_num" valid:"required"`
 	ReloadType        string `toml:"reload_type"`
+	MaxCheckTime      int64  `toml:"max_check_time"`
 }
 
 type RedisConnectConfig struct {

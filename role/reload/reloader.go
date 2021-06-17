@@ -29,6 +29,7 @@ type (
 		reloadGN     int
 		reloadPerNum int
 		reloadScale  time.Duration
+		maxCheckTime time.Duration
 		st           int64
 		et           int64
 		wg           chan struct{}
@@ -60,6 +61,12 @@ func ServerConfigWithReloadGN(gn int) ServerConfigOption {
 func ServerConfigWithReloadScale(scale time.Duration) ServerConfigOption {
 	return func(sc *server) {
 		sc.reloadScale = scale
+	}
+}
+
+func ServerConfigWithMaxCheckTime(t time.Duration) ServerConfigOption {
+	return func(sc *server) {
+		sc.maxCheckTime = t
 	}
 }
 
@@ -114,19 +121,24 @@ func ServerConfigWithET(et int64) ServerConfigOption {
 
 // 默认加载数量
 const (
-	defaultReloadGN     = 1
-	defaultReloadPerNum = 50
+	defaultReloadGN       = 1
+	defaultReloadPerNum   = 50
+	defaultReloadOverTime = time.Minute * 3
 )
 
 func NewServer(opts ...ServerConfigOption) *server {
 	s := &server{
 		reloadGN:     defaultReloadGN,
 		reloadPerNum: defaultReloadPerNum,
+		maxCheckTime: defaultReloadOverTime,
 		et:           time.Now().UnixNano(), // 这里不应该是时间戳了
 	}
 	for _, opt := range opts {
 		opt(s)
 	}
+	s.wg = make(chan struct{}, s.reloadGN)
+	s.rg = make(chan role.GenerateLoseTask, s.reloadGN)
+	s.st = 0
 	return s
 }
 
@@ -137,15 +149,6 @@ func (s *server) Run() error {
 
 func (s *server) Stop(_ role.StopType) error {
 	return nil
-}
-
-func (s *server) init() {
-	s.wg = make(chan struct{}, s.reloadGN)
-	s.rg = make(chan role.GenerateLoseTask, s.reloadGN)
-	for index := 0; index < s.reloadGN; index++ {
-		s.wg <- struct{}{}
-	}
-	s.st = 0
 }
 
 // 直到所有的数据都被写入
@@ -179,47 +182,58 @@ func (s *server) run() {
 	if s.logger != nil {
 		s.logger.Infof("reload latest task start: %d", l)
 	}
-	s.init()
-	s.reloadTasks(false)
+	s.reloadTasks()
 	if s.logger != nil {
 		s.logger.Info("reload latest task end")
 	}
-	s.reloadTasks(s.st <= s.et)
 }
 
-func (s *server) reloadTasks(loop bool) {
+func (s *server) reloadTasks() {
+	var tc <-chan time.Time
 	maxTimeout := 10
 	currentTimeout := 0
-	quitNum := 0
+	quitNum := s.reloadGN
+	sleep := func(reset bool) {
+		if !reset && currentTimeout < maxTimeout {
+			currentTimeout++
+		}
+		if reset {
+			currentTimeout = 0
+		}
+		time.Sleep(s.reloadScale << currentTimeout)
+	}
 	for {
 		tk, err := s.getTask()
-		if err != nil && (err != errEmptyTask || loop) {
+		if err != nil && err != errEmptyTask {
 			if s.logger != nil {
 				s.logger.Infof("get task failed: %v", err)
 			}
-			if currentTimeout < maxTimeout {
-				currentTimeout++
-			}
-			time.Sleep(s.reloadScale << currentTimeout)
+			sleep(false)
 			continue
 		}
 		if err == errEmptyTask {
-			// over
-			if quitNum >= s.reloadGN {
-				if !loop {
-					break
-				}
+			if quitNum < s.reloadGN {
+				<-s.wg
+				quitNum++
 				continue
 			}
-			<-s.wg
-			quitNum++
+			if tc == nil && s.maxCheckTime > 0 {
+				tc = time.After(s.maxCheckTime)
+			}
+			// over
+			select {
+			case <-tc:
+				return
+			default:
+			}
+			sleep(false)
+			s.st -= s.et + 1
 			continue
 		}
+		s.wg <- struct{}{}
 		s.runTask(tk)
-		if quitNum > 0 {
-			quitNum--
-		}
-		time.Sleep(s.reloadScale)
+		quitNum--
+		sleep(true)
 	}
 }
 
@@ -241,6 +255,7 @@ func (s *server) getRemoteTask() (t role.GenerateLoseTask, err error) {
 	if fer != nil {
 		if xerror.IsXCode(fer, xcode.DBRecordNotFound) {
 			err = errEmptyTask
+			s.st += s.et + 1
 			return
 		}
 		err = pkerr.WithMessage(fer, "get task failed")
