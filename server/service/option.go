@@ -8,6 +8,7 @@ import (
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
 	"github.com/zywaited/delay-queue/transport"
+	"github.com/zywaited/go-common/limiter"
 	"github.com/zywaited/go-common/xcopy"
 )
 
@@ -55,7 +56,7 @@ func HandleOptionWithLogger(logger system.Logger) HandleOption {
 	}
 }
 
-func HandleOptionWithXCopy(c *xcopy.XCopy) HandleOption {
+func HandleOptionWithXCopy(c xcopy.XCopy) HandleOption {
 	return func(h *Handle) {
 		h.cp = c
 	}
@@ -72,5 +73,17 @@ func HandleOptionTransporters(ts transport.TransporterM) HandleOption {
 func HandleOptionWithWait(wait bool) HandleOption {
 	return func(h *Handle) {
 		h.wait = wait
+	}
+}
+
+func HandleOptionWithGP(gp limiter.Pool) HandleOption {
+	return func(h *Handle) {
+		h.gp = gp
+	}
+}
+
+func HandleOptionWithIdCreator(version role.GenerateIds) HandleOption {
+	return func(h *Handle) {
+		h.idCreator = version
 	}
 }

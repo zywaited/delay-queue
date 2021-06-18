@@ -5,6 +5,7 @@ import (
 
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role/task"
+	"github.com/zywaited/go-common/limiter"
 )
 
 type config struct {
@@ -16,6 +17,7 @@ type config struct {
 	maxLevel         int               // 最大层级
 	currentLevel     int               // 当前层级
 	logger           system.Logger
+	gp               limiter.Pool
 }
 
 type Option func(*config)
@@ -58,6 +60,12 @@ func OptionWithScaleLevel(level time.Duration) Option {
 	}
 }
 
+func OptionWithGP(gp limiter.Pool) Option {
+	return func(c *config) {
+		c.gp = gp
+	}
+}
+
 // 时间轮内部调用，用于标识当前层级
 func optionWithLevel(level int) Option {
 	return func(c *config) {
@@ -86,5 +94,6 @@ func (c *config) clone() *config {
 		maxLevel:         c.maxLevel,
 		currentLevel:     c.currentLevel,
 		logger:           c.logger,
+		gp:               c.gp,
 	}
 }

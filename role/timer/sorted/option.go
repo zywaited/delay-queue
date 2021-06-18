@@ -5,6 +5,7 @@ import (
 
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/role/task"
+	"github.com/zywaited/go-common/limiter"
 )
 
 type (
@@ -16,6 +17,7 @@ type (
 		ns task.NewTaskStore
 
 		logger system.Logger
+		gp     limiter.Pool
 	}
 
 	ServerConfigOption func(*serverConfig)
@@ -36,5 +38,11 @@ func ServerConfigWithStore(ns task.NewTaskStore) ServerConfigOption {
 func ServerConfigWithLogger(logger system.Logger) ServerConfigOption {
 	return func(sc *serverConfig) {
 		sc.logger = logger
+	}
+}
+
+func ServerConfigWithGP(gp limiter.Pool) ServerConfigOption {
+	return func(sc *serverConfig) {
+		sc.gp = gp
 	}
 }

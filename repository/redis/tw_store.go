@@ -14,7 +14,7 @@ import (
 
 // 为了方便重载数据单独提供一个存储
 type TWStore struct {
-	*MapStore
+	*statusStore
 
 	absoluteName string // // prefix + "_" + name + "_set"
 
@@ -23,7 +23,7 @@ type TWStore struct {
 
 func NewTWStore(rp *redis.Pool, opts ...ConfigOption) *TWStore {
 	tws := &TWStore{
-		MapStore: NewMapStore(rp, opts...),
+		statusStore: NewStatusStore(rp, opts...),
 		stp: &sync.Pool{New: func() interface{} {
 			return &TWStoreTrans{}
 		}},
@@ -82,7 +82,7 @@ func (tws *TWStore) interInsert(c redis.Conn, t *model.Task) error {
 		return err
 	}
 	// 把创建时间写入
-	err = c.Send("ZADD", tws.absoluteName, t.CreatedAt, t.Uid)
+	err = c.Send("ZADD", tws.absoluteName, t.Score, t.Uid)
 	return errors.WithMessage(err, "redis zset 写入失败")
 }
 
@@ -98,7 +98,7 @@ func (tws *TWStore) interInsertMany(c redis.Conn, ts []*model.Task) error {
 		return err
 	}
 	for _, t := range ts {
-		err = c.Send("ZADD", tws.absoluteName, t.CreatedAt, t.Uid)
+		err = c.Send("ZADD", tws.absoluteName, t.Score, t.Uid)
 		if err != nil {
 			return errors.WithMessage(err, "redis zset 批量写入失败")
 		}
@@ -141,52 +141,10 @@ func (tws *TWStore) interRemoveMany(c redis.Conn, uids []string) error {
 	return nil
 }
 
-func (tws *TWStore) RangeReady(st, et, offset, limit int64) ([]*model.Task, error) {
-	c := tws.rp.Get()
-	defer func() {
-		_ = c.Close()
-	}()
-	uids, err := redis.Strings(c.Do("ZRANGEBYSCORE", tws.absoluteName, st, et, "LIMIT", offset, limit))
-	if err != nil {
-		// nil
-		if err == redis.ErrNil {
-			return make([]*model.Task, 0), nil
-		}
-		return nil, errors.WithMessage(err, "redis查询当前分值的任务失败")
-	}
-	// 这里处理下空数据
-	emptyTasks := make([]*model.Task, 0, len(uids))
-	mts, err := tws.batchWithEmpty(c, uids, func(uid string) {
-		mt := model.GenerateTask()
-		mt.Uid = uid
-		emptyTasks = append(emptyTasks, mt)
-	})
-	if err != nil {
-		return nil, err
-	}
-	mts = append(mts, emptyTasks...)
-	return mts, nil
-}
-
-func (tws *TWStore) ReadyNum(st, et int64) (int, error) {
-	c := tws.rp.Get()
-	defer func() {
-		_ = c.Close()
-	}()
-	l, err := redis.Int(c.Do("ZCOUNT", tws.absoluteName, st, et))
-	if err != nil {
-		if err == redis.ErrNil {
-			return l, nil
-		}
-		return l, errors.WithMessage(err, "redis查询当前分值的数量")
-	}
-	return l, nil
-}
-
 func (tws *TWStore) Status(uid string, tt pb.TaskType) error {
 	// redis数据直接删除即可
 	if tt == pb.TaskType_TaskFinished || tt == pb.TaskType_Ignore {
 		return tws.Remove(uid)
 	}
-	return tws.MapStore.Status(uid, tt)
+	return tws.statusStore.Status(uid, tt)
 }

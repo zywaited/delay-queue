@@ -3,6 +3,7 @@ package inter
 import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/zywaited/delay-queue/parser/system"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Config struct {
@@ -14,14 +15,26 @@ type Config struct {
 	Worker      *WorkerConfig
 	Log         *LogConfig
 	Redis       *RedisConnectConfig
+	Mongo       *MongoConnectConfig
 	Services    *ServiceConfig
 	GenerateId  *GenerateIdConfig `toml:"generate_id"`
+	Gp          *GpConfig         `toml:"gp"`
 }
 
 type GenerateIdConfig struct {
 	Type    string
 	Timeout int64
 	Group   *GroupConfig
+	Redis   *RedisGenerateIdConfig
+}
+
+type RedisGenerateIdConfig struct {
+	Prefix     string
+	CacheNum   int    `toml:"cache_num"`
+	ValidTime  int    `toml:"valid_time"`
+	CheckTime  int    `toml:"check_time"`
+	HashKey    string `toml:"hash_key"`
+	MaxLostNum int    `toml:"max_lost_num"`
 }
 
 type LogConfig struct {
@@ -34,6 +47,7 @@ type LogConfig struct {
 type DataSourceConfig struct {
 	Dst   string `valid:"required"` // data source type
 	Redis *RedisStoreConfig
+	Rst   string `toml:"rst"` // ready queue type
 }
 
 type RedisStoreConfig struct {
@@ -57,18 +71,19 @@ type GroupConfig struct {
 }
 
 type WorkerConfig struct {
-	RetryTimes    int  `toml:"retry_times"`
-	MultiNum      uint `toml:"multi_num" valid:"required"`
+	RetryTimes    int `toml:"retry_times"`
 	Timeout       int64
 	RepeatedTimes int64 `toml:"repeated_times"`
 }
 
 type TimingWheelConfig struct {
-	MaxLevel          int   `toml:"max_level" valid:"required"` // 最大层级
-	SlotNum           int   `toml:"slot_num" valid:"required"`
-	ReloadGoNum       int   `toml:"reload_go_num" valid:"required"`
-	ReloadConfigScale int64 `toml:"reload_config_scale" valid:"required"`
-	ReloadPerNum      int   `toml:"reload_per_num" valid:"required"`
+	MaxLevel          int    `toml:"max_level" valid:"required"` // 最大层级
+	SlotNum           int    `toml:"slot_num" valid:"required"`
+	ReloadGoNum       int    `toml:"reload_go_num" valid:"required"`
+	ReloadConfigScale int64  `toml:"reload_config_scale" valid:"required"`
+	ReloadPerNum      int    `toml:"reload_per_num" valid:"required"`
+	ReloadType        string `toml:"reload_type"`
+	MaxCheckTime      int64  `toml:"max_check_time"`
 }
 
 type RedisConnectConfig struct {
@@ -96,7 +111,31 @@ type GRPCServiceConfig struct {
 	Addr string
 }
 
+type GpConfig struct {
+	Limit     int32
+	Idle      int
+	IdleTime  int `toml:"idle_time"`
+	CheckNum  int `toml:"check_num"`
+	BlockTime int `toml:"block_time"`
+	SpanNum   int `toml:"span_num"`
+}
+
+type MongoConnectConfig struct {
+	Uri             string `toml:"uri"`                // uri
+	DbName          string `toml:"db_name"`            // 数据库名字
+	MaxPoolSize     uint64 `toml:"max_pool_size"`      // 最大连接数
+	ConnectTimeout  uint64 `toml:"connect_timeout"`    // 连接超时时间, 毫秒
+	MaxConnIdleTime uint64 `toml:"max_conn_idle_time"` // 连接空闲时间,毫秒
+	Transaction     bool   `toml:"transaction"`        // 是否开启事务
+}
+
 type ConfigBoot struct {
 	Logger system.Logger
 	Redis  *redis.Pool
+	Mongo  MongoInfo
+}
+
+type MongoInfo struct {
+	Client  *mongo.Client
+	Version int // 只考虑大版本
 }

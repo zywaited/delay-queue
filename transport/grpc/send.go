@@ -13,6 +13,7 @@ import (
 	mgrpc "github.com/zywaited/delay-queue/middleware/grpc"
 	"github.com/zywaited/delay-queue/parser/system"
 	"github.com/zywaited/delay-queue/protocol/pb"
+	"github.com/zywaited/go-common/limiter"
 	"google.golang.org/grpc"
 )
 
@@ -44,17 +45,17 @@ func SenderOptionWithLogger(logger system.Logger) SenderOption {
 	}
 }
 
-func SenderOptionWithConnectTime(connectTime time.Duration) SenderOption {
+func SenderOptionWithGP(gp limiter.Pool) SenderOption {
 	return func(s *Sender) {
-		s.connectTime = connectTime
+		s.gp = gp
 	}
 }
 
 const (
-	defaultConnectTimeout = time.Second
-	defaultCheckTime      = time.Minute
-	defaultIdleTime       = time.Minute * 5
-	defaultCheckNum       = 50 // 每次处理50个链接
+	defaultTimeout   = time.Second * 3
+	defaultCheckTime = time.Minute
+	defaultIdleTime  = time.Minute * 5
+	defaultCheckNum  = 50 // 每次处理50个链接
 )
 
 type ct struct {
@@ -72,21 +73,21 @@ type Sender struct {
 	locker sync.RWMutex
 	sm     map[string]*ct
 
-	timeout     time.Duration
-	idleTime    time.Duration
-	checkTime   time.Duration
-	connectTime time.Duration
-	logger      system.Logger
+	timeout   time.Duration
+	idleTime  time.Duration
+	checkTime time.Duration
+	logger    system.Logger
+	gp        limiter.Pool
 
 	ctp *sync.Pool
 }
 
 func NewSender(opts ...SenderOption) *Sender {
 	s := &Sender{
-		sm:          make(map[string]*ct),
-		connectTime: defaultConnectTimeout,
-		checkTime:   defaultCheckTime,
-		idleTime:    defaultIdleTime,
+		sm:        make(map[string]*ct),
+		timeout:   defaultTimeout,
+		checkTime: defaultCheckTime,
+		idleTime:  defaultIdleTime,
 		ctp: &sync.Pool{New: func() interface{} {
 			return &ct{}
 		}},
@@ -103,6 +104,7 @@ func (s *Sender) check() {
 		return
 	}
 	t := time.NewTicker(s.checkTime)
+	defer t.Stop()
 	for {
 		select {
 		case <-t.C:
@@ -188,9 +190,7 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 	s.locker.RUnlock()
 	ctx := context.Background()
 	if s.timeout > 0 {
-		tx, cancel := context.WithTimeout(ctx, s.timeout)
-		defer cancel()
-		ctx = tx
+		ctx, _ = context.WithTimeout(ctx, s.timeout)
 	}
 	if c == nil {
 		s.locker.Lock()
@@ -203,18 +203,9 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 			c.num = 1
 			c.key = addr.Address
 			s.sm[addr.Address] = c
-			go func() {
-				defer func() {
-					_ = recover()
-					close(c.c)
-				}()
-				tx := ctx
-				if s.connectTime > 0 {
-					tctx, cancel := context.WithTimeout(tx, s.connectTime)
-					defer cancel()
-					tx = tctx
-				}
-				gc, err := grpc.DialContext(tx, addr.Address,
+			err := s.gp.Submit(ctx, func() {
+				defer close(c.c)
+				gc, err := grpc.DialContext(ctx, addr.Address,
 					grpc.WithChainUnaryInterceptor(mgrpc.UnaryClientRecoverInterceptor(s.logger)),
 					grpc.WithInsecure(),
 					grpc.WithBlock(),
@@ -222,7 +213,11 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 				if err == nil {
 					c.gc = gc
 				}
-			}()
+			})
+			// submit timeout
+			if err != nil {
+				close(c.c)
+			}
 		}
 		s.locker.Unlock()
 	}
@@ -239,14 +234,14 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 		_, err = pb.NewCallbackClient(c.gc).Send(ctx, req)
 	} else {
 		// 指定服务端，那只有直接走逻辑调用
-		// 规定：返回值必须是empty.Empty
+		// 规定：只要不返回错误
 		out := new(any.Any)
 		err = c.gc.Invoke(ctx, "/"+strings.TrimLeft(addr.Path, "/"), req, out)
 	}
 	return pkgerr.WithMessage(err, "call grpc faileds")
 }
 
-func (s *Sender) Valid(addr *pb.CallbackInfo) error {
+func (s *Sender) Valid(_ *pb.CallbackInfo) error {
 	return nil
 }
 

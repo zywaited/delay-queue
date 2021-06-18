@@ -7,11 +7,11 @@ import (
 	"github.com/zywaited/delay-queue/role"
 	"github.com/zywaited/delay-queue/role/runner"
 	"github.com/zywaited/delay-queue/transport"
+	"github.com/zywaited/go-common/limiter"
 )
 
 type option struct {
 	retryTimes    int
-	multiNum      int
 	timeout       time.Duration
 	repeatedTimes int
 	configScale   time.Duration
@@ -19,6 +19,7 @@ type option struct {
 	logger        system.Logger
 	store         role.DataStore
 	ts            transport.TransporterM
+	gp            limiter.Pool
 }
 
 type Options func(*option)
@@ -26,12 +27,6 @@ type Options func(*option)
 func OptionsWithRetryTimes(retryTimes int) Options {
 	return func(op *option) {
 		op.retryTimes = retryTimes
-	}
-}
-
-func OptionsWithMultiNum(multiNum int) Options {
-	return func(op *option) {
-		op.multiNum = multiNum
 	}
 }
 
@@ -76,5 +71,11 @@ func OptionWithTransporters(ts transport.TransporterM) Options {
 		for t, tr := range ts {
 			op.ts[t] = tr
 		}
+	}
+}
+
+func OptionWithGP(gp limiter.Pool) Options {
+	return func(op *option) {
+		op.gp = gp
 	}
 }

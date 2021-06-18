@@ -21,20 +21,23 @@ import (
 	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/timer"
 	"github.com/zywaited/delay-queue/transport"
+	"github.com/zywaited/go-common/limiter"
 	"github.com/zywaited/go-common/xcopy"
 )
 
 type Handle struct {
-	store    role.DataStore
-	timer    timer.Scanner
-	tp       task.Factory
-	timeout  time.Duration
-	runner   task.Runner
-	baseTime time.Duration
-	logger   system.Logger
-	cp       *xcopy.XCopy
-	ts       transport.TransporterM
-	wait     bool
+	store     role.DataStore
+	timer     timer.Scanner
+	tp        task.Factory
+	timeout   time.Duration
+	runner    task.Runner
+	baseTime  time.Duration
+	logger    system.Logger
+	cp        xcopy.XCopy
+	ts        transport.TransporterM
+	gp        limiter.Pool
+	idCreator role.GenerateIds
+	wait      bool
 }
 
 func NewHandle(opts ...HandleOption) *Handle {
@@ -66,10 +69,10 @@ func (h *Handle) generateId(addReq *pb.AddReq) string {
 	}
 	mh := md5.New()
 	mh.Write(bs)
-	return hex.EncodeToString(mh.Sum([]byte("med-delay-queue")))
+	return hex.EncodeToString(mh.Sum([]byte("delay-queue")))
 }
 
-func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
+func (h *Handle) add(ctx context.Context, uid string, addReq *pb.AddReq) (err error) {
 	defer func() {
 		if rerr := recover(); rerr != nil {
 			if h.logger != nil {
@@ -105,6 +108,10 @@ func (h *Handle) add(uid string, addReq *pb.AddReq) (err error) {
 	if err != nil {
 		// 该分支代表已经写入存储，但未入队列
 		mt := model.GenerateTask()
+		mt.Score, err = h.idCreator.Id(ctx)
+		if err != nil {
+			return pkgerr.WithMessage(err, "score 生成失败")
+		}
 		mt.Uid = uid
 		mt.Name = strings.TrimSpace(addReq.Name)
 		mt.Args = strings.TrimSpace(addReq.Args)
@@ -164,11 +171,13 @@ func (h *Handle) Add(ctx context.Context, addReq *pb.AddReq) (*pb.AddResp, error
 		h.logger.Infof("[%s]generate task uid: %s", traceId, uid)
 	}
 	c := make(chan error, 1)
-	go func() {
-		c <- h.add(uid, addReq)
-	}()
+	ctx = h.acTimeoutC(ctx)
+	_ = h.gp.Submit(ctx, func() {
+		c <- h.add(ctx, uid, addReq)
+		close(c)
+	})
 	select {
-	case <-h.acTimeoutC():
+	case <-ctx.Done():
 		return nil, xerror.WithXCodeMessage(xcode.GatewayTimeout, "任务写入超时")
 	case err := <-c:
 		if err != nil {
@@ -188,7 +197,8 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		mt  *model.Task
 		err error
 	)
-	go func() {
+	ctx = h.acTimeoutC(ctx)
+	_ = h.gp.Submit(ctx, func() {
 		defer func() {
 			if rerr := recover(); rerr != nil {
 				if h.logger != nil {
@@ -199,9 +209,10 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		}()
 		mt, err = h.store.Retrieve(uid)
 		c <- pkgerr.WithMessage(err, "任务查询失败")
-	}()
+		close(c)
+	})
 	select {
-	case <-h.acTimeoutC():
+	case <-ctx.Done():
 		return nil, xerror.WithXCodeMessage(xcode.GatewayTimeout, "任务查询超时")
 	case err = <-c:
 		if err != nil {
@@ -209,7 +220,7 @@ func (h *Handle) Get(ctx context.Context, req *pb.RetrieveReq) (*pb.Task, error)
 		}
 		pt := &pb.Task{}
 		defer model.ReleaseTask(mt)
-		if err = h.cp.SetSource(mt).CopyF(pt); err != nil {
+		if err = h.cp.CopyF(pt, mt); err != nil {
 			return nil, xerror.Wrap(err, "任务数据协议转换失败")
 		}
 		return pt, nil
@@ -222,11 +233,13 @@ func (h *Handle) Remove(ctx context.Context, req *pb.RemoveReq) (*empty.Empty, e
 	}
 	uid := strings.TrimSpace(req.Uid)
 	c := make(chan error, 1)
-	go func() {
+	ctx = h.acTimeoutC(ctx)
+	_ = h.gp.Submit(ctx, func() {
 		c <- h.remove(uid)
-	}()
+		close(c)
+	})
 	select {
-	case <-h.acTimeoutC():
+	case <-ctx.Done():
 		return nil, xerror.WithXCodeMessage(xcode.GatewayTimeout, "任务查询超时")
 	case err := <-c:
 		if err != nil {
@@ -236,11 +249,15 @@ func (h *Handle) Remove(ctx context.Context, req *pb.RemoveReq) (*empty.Empty, e
 	}
 }
 
-func (h *Handle) acTimeoutC() (c <-chan time.Time) {
-	if h.timeout > 0 {
-		c = time.NewTimer(h.timeout * h.baseTime).C
+func (h *Handle) acTimeoutC(ctx context.Context) context.Context {
+	if h.timeout <= 0 {
+		return ctx
 	}
-	return
+	dt, ok := ctx.Deadline()
+	if !ok || dt.Sub(time.Now()) > h.timeout*h.baseTime {
+		ctx, _ = context.WithTimeout(ctx, h.timeout*h.baseTime)
+	}
+	return ctx
 }
 
 func (h *Handle) remove(uid string) (err error) {

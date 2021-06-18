@@ -5,11 +5,13 @@ import (
 
 	"github.com/zywaited/delay-queue/protocol/pb"
 	"github.com/zywaited/go-common/xcopy"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Task struct {
-	Id uint `json:"id,omitempty"`
+	Id string `json:"id,omitempty"`
 
+	Score        int64  `json:"score"`
 	Uid          string `json:"uid"`
 	Name         string `json:"name"`
 	Args         string `json:"args"`
@@ -52,7 +54,9 @@ func (t *Task) NextDelayTime() time.Duration {
 type DbTask struct {
 	Id uint `json:"id"`
 
+	Token        string      `json:"token"`
 	Uid          string      `json:"uid"`
+	Score        int64       `json:"score"`
 	Name         string      `json:"name"`
 	Type         pb.TaskType `json:"type"`
 	Times        int         `json:"times"`          // 发送次数
@@ -70,7 +74,7 @@ type DbTask struct {
 }
 
 func (t *DbTask) TableName() string {
-	return "med_delay_queue.task"
+	return "delay_queue.task"
 }
 
 type RedisTask map[string]interface{}
@@ -92,4 +96,40 @@ func (rt RedisTask) Args(args *[]interface{}) {
 		}
 		*args = append(*args, value)
 	}
+}
+
+type MongoTask struct {
+	Id primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty" copy:"-"`
+
+	Score        int64  `json:"score" bson:"score"`
+	Token        string `json:"token" bson:"token"`
+	Uid          string `json:"uid" bson:"uid"`
+	Name         string `json:"name" bson:"name"`
+	Args         string `json:"args" bson:"args"`
+	Type         int32  `json:"type" bson:"type"`
+	Times        int    `json:"times" bson:"times"`                             // 发送次数
+	RetryTimes   int    `json:"retry_times" bson:"retry_times"`                 // 重试次数
+	ExecTime     int64  `json:"exec_time" bson:"exec_time"`                     // 执行时间
+	NextExecTime int64  `json:"next_exec_time,omitempty" bson:"next_exec_time"` // 下次执行时间
+
+	Schema  string `json:"schema,omitempty" bson:"schema"`
+	Address string `json:"address,omitempty" bson:"address"`
+	Path    string `json:"path,omitempty" bson:"path"`
+
+	CreatedAt int64 `json:"created_at,omitempty" bson:"created_at"`
+	UpdatedAt int64 `json:"updated_at,omitempty" bson:"updated_at"`
+	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at"`
+}
+
+func (t *Task) ConvertMongoTask(cp xcopy.XCopy, mt *MongoTask) {
+	_ = cp.CopySF(mt, t)
+	mt.Id = primitive.NilObjectID
+}
+
+func (mt *MongoTask) ConvertTask(cp xcopy.XCopy, t *Task) {
+	_ = cp.CopySF(t, mt)
+}
+
+func (mt *MongoTask) Collection() string {
+	return "task"
 }

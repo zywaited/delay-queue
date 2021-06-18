@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefaultStorePrefix = "med-delay-queue"
+	DefaultStorePrefix = "delay-queue"
 	DefaultStoreName   = "timing-task"
 )
 
@@ -17,7 +17,7 @@ type config struct {
 	name   string
 	id     string
 
-	cp      *xcopy.XCopy // 仅仅是为了内部尽量减少全局变量依赖
+	cp      xcopy.XCopy // 仅仅是为了内部尽量减少全局变量依赖
 	convert role.PbConvertTask
 }
 
@@ -35,7 +35,7 @@ func ConfigWithName(name string) ConfigOption {
 	}
 }
 
-func ConfigWithCopy(cp *xcopy.XCopy) ConfigOption {
+func ConfigWithCopy(cp xcopy.XCopy) ConfigOption {
 	return func(c *config) {
 		c.cp = cp
 	}

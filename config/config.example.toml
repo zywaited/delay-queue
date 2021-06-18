@@ -1,59 +1,117 @@
-# 基础值
+### 时间轮精度配置
+# 默认时间是毫秒
+# 配置为秒
 base_level = "second"
 
-# 指针转动时间
+### 指针转动时间
+# 时间: config_scale*base_level
 config_scale = 1
 
+### 当前服务角色
+# 二进制组合值
 # 1: timer; 2: worker
 role = 3
 
 # 存储
 [data_source]
-    dst = "redis"
-    [data_source.redis]
-        # 前缀
-        prefix = "med-delay-queue-store"
-        # 名称
-        name = "task"
+        # 类型：支持 redis\mongo
+        # 配置对应的基础配置
+        dst = "redis"
+        # ready queue类型
+        # 类型：
+        # 1: redis 依赖redis基础配置
+        # 2: memory timer&worker必须部署在同一台机器上，chanel内部交互
+        rst = "memory"
+        # 存储额外配置
+        [data_source.redis]
+            # 前缀
+            prefix = "delay-queue-store"
+            # 名称
+            name = "task"
 
-# 扫描器
+# redis基础配置
+[redis]
+    # 地址
+    addr = ""
+    # 密码
+    auth = ""
+    db = 0
+    # 最大连接数
+    idle = 100
+    # 最大空闲数
+    active = 10
+    # 是否等待连接
+    wait = true
+    # 连接超时时间[毫秒]
+    connect_timeout = 300
+
+# mongo基础配置
+[mongo]
+    # 地址
+    uri = ""
+    # 数据库名
+    db_name = ""
+    # 最大连接数
+    max_pool_size = 100
+    # 最大连接时间[毫秒]
+    connect_timeout = 1000
+    # 最大空闲时间[毫秒]
+    max_conn_idle_time = 1000
+    # 是否开启事务[当该值为true并且数据库版本大于等于4.0时生效]
+    transaction = false
+
+# 扫描器配置: 当前role&1>0时生效
 [timer]
+    # 类型:
+    # 1: timing-wheel-server 时间轮
+    # 2: sorted-server redis zset依赖redis基础配置
     st = "timing-wheel-server"
+    # 定时时间: config_scale_level*base_level
     config_scale_level = 1
+    # 最大检测次数
     max_check_time = 8
+    # 下一次检测时间的基数
     check_multi = 15
+    # 添加任务超时时间: timeout*base_level
     timeout = 3
+    # 时间轮的额外配置
     [timer.timing_wheel]
+        # 最大层级
         max_level = 5
+        # 一层的卡槽数
         slot_num = 60
+        # 重载的协程数
         reload_go_num = 6
+        # 重载的间隔时间: reload_config_scale*base_level
+        # 如果为负数，那么时间为1/reload_config_scale*base_level
         reload_config_scale = 1
-        reload_per_num = 50
+        # 每次重载的数量
+        reload_per_num = 500
+        # 等待多少时间才重载[秒], 这里是为了防止竞争锁导致的数据未写入
+        max_check_time = 3
 
-# 回调器
+# 回调器: 当前role&2>0时生效
 [worker]
-    retry_times = 3
-    multi_num = 3
+    # 回调重试次数
+    retry_times = 2
+    # 回调超时时间: timeout*base_level
     timeout = 3
 
 # 日志
 [log]
-    dir = "/var/log/medlinker/med-delay-queue"
+    # 路径
+    dir = "/var/log/medlinker/delay-queue"
+    # 打印级别
     level = "info"
+    # 类别
     category = "service"
 
-[redis]
-    addr = "127.0.0.1:6379"
-    auth = ""
-    db = 0
-    idle = 100
-    active = 10
-    wait = true
-    connect_timeout = 300
-
-# 监听
+# 服务监听: 当前role&1>0时生效
 [services]
+    # 支持的类型
     types = ["GRPC", "HTTP"]
+    # 是否等待任务进入扫描器中, 这个可以false, 理论上任务不会丢失
+    wait = false
     [services.http]
         addr = "0.0.0.0:80"
     [services.grpc]
@@ -62,9 +120,49 @@ role = 3
 # 服务唯一标识
 [generate_id]
     # 生成器类型
+    # 1: default.name 本地配置文件[generate_id.group]，适合单机或者有状态服务集群，以node区分不同服务 【雪花算法】
+    # 2: local.name 环境变量，适合单机或者有状git态服务集群，以node区分不同服务【雪花算法】
+    # 2.1 timer: DELAY_QUEUE_TIMER_NAME string
+    # 2.2 worker: DELAY_QUEUE_WORKER_NAME string 这个可以不配，用处不大
+    # 2.3 node: DELAY_QUEUE_NODE_NAME int 服务编号
+    # 3: redis.name 基于redis生成全局id和抢占timer锁
+    # 3.1 需要提前配置好对应的hash key: hset prefix_keys{hash} key version [有多少服务就应该有多少个key]
+    # 3.2 prefix_key_ids{hash} 自增ID
+    # 3.3 prefix_key_lock 分布式锁
     type = ""
     timeout = 1000
     [generate_id.group]
         id = "1"
         group = "1-1"
+        # node
         num = 1
+    [generate_id.redis]
+        # 所有的key的前缀
+        prefix = "delay-queue"
+        # 缓存本地数量ID
+        cache_num = 200
+        # 锁最大存活时间[秒]
+        valid_time = 5
+        # 续约时间[秒]
+        check_time = 3
+        # key的hash值，为了集群保证分布到同一卡槽
+        hash_key = "delay-queue"
+        # 最大续约失败次数
+        max_lost_num = 3
+
+# 协程池配置
+[gp]
+    # 协程最大数量
+    limit = 1000
+    # 最大空闲数量
+    idle = 100
+    # 最大空闲时间: idle_time*base_level
+    idle_time = 3
+    # 每次检测协程数
+    check_num = 50
+    # 阻塞时间: block_time*base_level
+    # 扩展次数
+    # 如果协程数达到最大值，并且有新的任务需要执行，这时可以额外开辟协程，达到扩展次数后不再增加
+    # 如果为负数，那么时间为1/block_time*base_level
+    block_time = 1
+    span_num = 5

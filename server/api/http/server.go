@@ -11,6 +11,10 @@ import (
 	"github.com/zywaited/delay-queue/protocol/pb"
 )
 
+type request struct {
+	Uid string `uri:"uid"`
+}
+
 type Server struct {
 	s pb.DelayQueueServer
 }
@@ -45,13 +49,16 @@ func (s *Server) Add(c *gin.Context) {
 }
 
 func (s *Server) Get(c *gin.Context) {
-	req := &pb.RetrieveReq{}
-	if err := c.ShouldBindJSON(req); err != nil {
+	req := &request{}
+	if err := c.ShouldBindUri(req); err != nil {
 		c.Status(xcode.RequestParamError.HttpStatus())
 		return
 	}
 	traceId, _ := c.Get(middleware.TraceIdKey)
-	resp, err := s.s.Get(context.WithValue(context.Background(), middleware.TraceIdKey, traceId), req)
+	resp, err := s.s.Get(
+		context.WithValue(context.Background(), middleware.TraceIdKey, traceId),
+		&pb.RetrieveReq{Uid: req.Uid},
+	)
 	if err != nil {
 		s.error(c, err)
 		return
@@ -60,13 +67,16 @@ func (s *Server) Get(c *gin.Context) {
 }
 
 func (s *Server) Remove(c *gin.Context) {
-	req := &pb.RemoveReq{}
-	if err := c.ShouldBindJSON(req); err != nil {
+	req := &request{}
+	if err := c.ShouldBindUri(req); err != nil {
 		c.Status(xcode.RequestParamError.HttpStatus())
 		return
 	}
 	traceId, _ := c.Get(middleware.TraceIdKey)
-	_, err := s.s.Remove(context.WithValue(context.Background(), middleware.TraceIdKey, traceId), req)
+	_, err := s.s.Remove(
+		context.WithValue(context.Background(), middleware.TraceIdKey, traceId),
+		&pb.RemoveReq{Uid: req.Uid},
+	)
 	if err != nil {
 		s.error(c, err)
 		return
