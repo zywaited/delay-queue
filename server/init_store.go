@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/md5"
+	"encoding/hex"
 	"errors"
 
 	"github.com/zywaited/delay-queue/inter"
@@ -65,7 +66,7 @@ func (so *storeOption) initMongoDataSource(dq *DelayQueue) error {
 	// 对timerId做MD5
 	m := md5.New()
 	m.Write([]byte(dq.timerId))
-	token := string(m.Sum(nil))
+	token := hex.EncodeToString(m.Sum(nil))
 	opts := []mongo.ConfigOption{
 		mongo.ConfigWithCopy(dq.cp),
 		mongo.ConfigWithConvert(dq.convert),
