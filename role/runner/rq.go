@@ -119,6 +119,9 @@ func (r *runner) Run(tk task.Task) error {
 		return nil
 	}
 	if pb.TaskType(mt.Type) == pb.TaskType_TaskFinished || mt.Times > 0 {
+		if r.logger != nil {
+			r.logger.Infof("runner run task[%s] finished", tk.Uid())
+		}
 		return nil
 	}
 	if mt.RetryTimes > r.maxCheckTime {

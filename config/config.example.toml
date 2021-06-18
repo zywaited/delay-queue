@@ -87,6 +87,8 @@ role = 3
         reload_config_scale = 1
         # 每次重载的数量
         reload_per_num = 500
+        # 等待多少时间才重载[秒], 这里是为了防止竞争锁导致的数据未写入
+        max_check_time = 3
 
 # 回调器: 当前role&2>0时生效
 [worker]
