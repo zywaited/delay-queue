@@ -9,8 +9,8 @@
 | 类型     | 方法         | 方式         |
 | -------- | ------------ | ------------ |
 | 添加任务 | /task/add    | POST         |
-| 删除任务 | /task/remove | POST、DELETE |
-| 查询任务 | /task/get    | GET          |
+| 删除任务 | /task/remove/:uid | POST、DELETE |
+| 查询任务 | /task/get/:uid    | GET          |
 
 ### 2 方法
 #### 2.1 添加任务

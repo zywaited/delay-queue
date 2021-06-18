@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	pkgerr "github.com/pkg/errors"
@@ -58,15 +59,15 @@ func (dq *DelayQueue) Run() error {
 	}
 	// loop
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
 	select {
 	case <-dq.ec:
 		if dq.c.CB.Logger != nil {
 			dq.c.CB.Logger.Info("服务管道终止")
 		}
-	case <-sc:
+	case sig := <-sc:
 		if dq.c.CB.Logger != nil {
-			dq.c.CB.Logger.Info("服务信号终止")
+			dq.c.CB.Logger.Infof("服务信号终止: %s", sig)
 		}
 	}
 	for _, opt := range dq.opts {

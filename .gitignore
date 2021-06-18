@@ -18,5 +18,4 @@ config/config.toml
 main
 .vscode
 go.sum
-/med-order
 *.log

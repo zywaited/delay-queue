@@ -121,10 +121,10 @@ func (po *protocolOption) runHTTPServer(dq *DelayQueue, c chan error, handler pb
 	s := http.NewServer(handler)
 	rg := g.Group("task")
 	rg.POST("/add", s.Add)
-	rg.GET("/get", s.Get)
+	rg.GET("/get/:uid", s.Get)
 	// 可能部分服务器没有当前方法
-	rg.DELETE("/remove", s.Remove)
-	rg.POST("/remove", s.Remove)
+	rg.DELETE("/remove/:uid", s.Remove)
+	rg.POST("/remove/:uid", s.Remove)
 	go func() {
 		if dq.c.CB.Logger != nil {
 			dq.c.CB.Logger.Infof("HTTP SERVER START: %s", dq.c.C.Services.HTTP.Addr)

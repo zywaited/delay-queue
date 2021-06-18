@@ -131,7 +131,7 @@ func (io *currentIdOption) Run(dq *DelayQueue) error {
 	go func() {
 		verr := version.Run()
 		dq.timerId, _ = version.Timer(ctx)
-		dq.workerId, _ = version.Timer(ctx)
+		dq.workerId, _ = version.Worker(ctx)
 		ec <- verr
 	}()
 	select {
@@ -144,7 +144,7 @@ func (io *currentIdOption) Run(dq *DelayQueue) error {
 	}
 	dq.idCreator = version
 	if dq.c.CB.Logger != nil {
-		dq.c.CB.Logger.Infof("SERVER NAME: %s: %s", dq.timerId, dq.workerId)
+		dq.c.CB.Logger.Infof("SERVER NAME: %s - %s", dq.timerId, dq.workerId)
 	}
 	return nil
 }

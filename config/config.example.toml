@@ -83,6 +83,7 @@ role = 3
         # 重载的协程数
         reload_go_num = 6
         # 重载的间隔时间: reload_config_scale*base_level
+        # 如果为负数，那么时间为1/reload_config_scale*base_level
         reload_config_scale = 1
         # 每次重载的数量
         reload_per_num = 500
@@ -123,6 +124,7 @@ role = 3
     # 2.2 worker: DELAY_QUEUE_WORKER_NAME string 这个可以不配，用处不大
     # 2.3 node: DELAY_QUEUE_NODE_NAME int 服务编号
     # 3: redis.name 基于redis生成全局id和抢占timer锁
+    # 3.1 需要提前配置好对应的hash key: hset prefix_keys{hash} key version [有多少服务就应该有多少个key]
     type = ""
     timeout = 1000
     [generate_id.group]
@@ -157,5 +159,6 @@ role = 3
     # 阻塞时间: block_time*base_level
     # 扩展次数
     # 如果协程数达到最大值，并且有新的任务需要执行，这时可以额外开辟协程，达到扩展次数后不再增加
+    # 如果为负数，那么时间为1/block_time*base_level
     block_time = 1
     span_num = 5
