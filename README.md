@@ -21,7 +21,7 @@
 2: memory chan 【role: timer&worker】
 
 ## 配置
-参考: https://github.com/zywaited/delay-queue/blob/master/config.example.toml
+参考: https://github.com/zywaited/delay-queue/blob/master/config/config.example.toml
 
 ## 访问
 参考: https://github.com/zywaited/delay-queue/blob/master/visit.md
