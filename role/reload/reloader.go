@@ -3,7 +3,6 @@ package reload
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"time"
 
 	pkerr "github.com/pkg/errors"
@@ -32,7 +31,6 @@ type (
 		reloadScale  time.Duration
 		maxCheckTime time.Duration
 		st           int64
-		lt           int64
 		et           int64
 		wg           chan struct{}
 		rg           chan role.GenerateLoseTask
@@ -181,6 +179,13 @@ func (s *server) run() {
 			time.Sleep(s.reloadScale)
 		}
 	}
+	if s.maxCheckTime > 0 {
+		if s.logger != nil {
+			s.logger.Info("reload wait for timeout")
+		}
+		// 这里为了解决部分延迟问题
+		<-time.After(s.maxCheckTime)
+	}
 	if s.logger != nil {
 		s.logger.Infof("reload latest task start: %d", l)
 	}
@@ -191,7 +196,6 @@ func (s *server) run() {
 }
 
 func (s *server) reloadTasks() {
-	var tc <-chan time.Time
 	maxTimeout := 5
 	currentTimeout := 0
 	quitNum := s.reloadGN
@@ -219,18 +223,7 @@ func (s *server) reloadTasks() {
 				quitNum++
 				continue
 			}
-			if tc == nil && s.maxCheckTime > 0 {
-				tc = time.After(s.maxCheckTime)
-			}
-			// over
-			select {
-			case <-tc:
-				return
-			default:
-			}
-			sleep(false)
-			s.st = s.lt
-			continue
+			return
 		}
 		if quitNum > 0 {
 			s.wg <- struct{}{}
@@ -311,17 +304,6 @@ func (s *server) runTask(t role.GenerateLoseTask) {
 		}
 		if s.logger != nil {
 			s.logger.Infof("reload task: %d", len(ts))
-		}
-		// 记录最大的值
-		maxLast := t.Next()
-		for {
-			currentLast := atomic.LoadInt64(&s.lt)
-			if maxLast <= currentLast {
-				break
-			}
-			if atomic.CompareAndSwapInt64(&s.lt, currentLast, maxLast) {
-				break
-			}
 		}
 		if t.Valid() {
 			// 这里轮换是为了不占用协程时间太久

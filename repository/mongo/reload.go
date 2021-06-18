@@ -30,7 +30,7 @@ func (gl *generateLoseStore) RangeReady(st, et, limit int64) (ts []*model.Task, 
 	c, ferr := gl.collection.Find(
 		ctx,
 		bson.M{
-			"score": bson.M{"$lte": st, "$gte": et},
+			"score": bson.M{"$gte": st, "$lte": et},
 			"token": gl.c.token,
 			"type":  bson.M{"$nin": []int32{int32(pb.TaskType_TaskFinished), int32(pb.TaskType_Ignore)}},
 		},
@@ -70,7 +70,7 @@ func (gl *generateLoseStore) ReadyNum(st, et int64) (n int64, err error) {
 	n, err = gl.collection.CountDocuments(
 		ctx,
 		bson.M{
-			"score": bson.M{"$lte": st, "$gte": et},
+			"score": bson.M{"$gte": st, "$lte": et},
 			"token": gl.c.token,
 			"type":  bson.M{"$nin": []int32{int32(pb.TaskType_TaskFinished), int32(pb.TaskType_Ignore)}},
 		},
@@ -86,7 +86,7 @@ func (gl *generateLoseStore) NextReady(st, et, limit int64) (int64, error) {
 	r := gl.collection.FindOne(
 		ctx,
 		bson.M{
-			"score": bson.M{"$lte": st, "$gte": et},
+			"score": bson.M{"$gte": st, "$lte": et},
 			"token": gl.c.token,
 			"type":  bson.M{"$nin": []int32{int32(pb.TaskType_TaskFinished), int32(pb.TaskType_Ignore)}},
 		},

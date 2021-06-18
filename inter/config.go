@@ -125,6 +125,7 @@ type MongoConnectConfig struct {
 	MaxPoolSize     uint64 `toml:"max_pool_size"`      // 最大连接数
 	ConnectTimeout  uint64 `toml:"connect_timeout"`    // 连接超时时间, 毫秒
 	MaxConnIdleTime uint64 `toml:"max_conn_idle_time"` // 连接空闲时间,毫秒
+	Transaction     bool   `toml:"transaction"`        // 是否开启事务
 }
 
 type ConfigBoot struct {

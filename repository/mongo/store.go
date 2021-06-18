@@ -40,11 +40,15 @@ func NewStore(client *mongo.Client, opts ...ConfigOption) *store {
 }
 
 func (s *store) Insert(t *model.Task) error {
+	return s.insert(context.Background(), t)
+}
+
+func (s *store) insert(ctx context.Context, t *model.Task) error {
 	// note 后续这里要记录下主键ID
 	mt := s.ap.Get().(*model.MongoTask)
 	defer s.ap.Put(mt)
 	t.ConvertMongoTask(s.c.cp, mt)
-	_, err := s.collection.InsertOne(context.Background(), t)
+	_, err := s.collection.InsertOne(ctx, mt)
 	return errors.WithMessage(err, "Mongo数据写入失败[Insert]")
 }
 
@@ -69,7 +73,11 @@ func (s *store) Retrieve(uid string) (*model.Task, error) {
 }
 
 func (s *store) Remove(uid string) error {
-	_, err := s.collection.DeleteOne(context.Background(), bson.M{"uid": uid})
+	return s.remove(context.Background(), uid)
+}
+
+func (s *store) remove(ctx context.Context, uid string) error {
+	_, err := s.collection.DeleteOne(ctx, bson.M{"uid": uid})
 	return errors.WithMessage(err, "Mongo数据删除失败")
 }
 
@@ -109,6 +117,10 @@ func (s *store) Batch(uids []string) (ts []*model.Task, err error) {
 }
 
 func (s *store) InsertMany(ts []*model.Task) error {
+	return s.insertMany(context.Background(), ts)
+}
+
+func (s *store) insertMany(ctx context.Context, ts []*model.Task) error {
 	records := make([]interface{}, 0, len(ts))
 	defer func() {
 		for _, record := range records {
@@ -120,11 +132,15 @@ func (s *store) InsertMany(ts []*model.Task) error {
 		t.ConvertMongoTask(s.c.cp, mt)
 		records = append(records, mt)
 	}
-	_, err := s.collection.InsertMany(context.Background(), records)
+	_, err := s.collection.InsertMany(ctx, records)
 	return errors.WithMessage(err, "Mongo数据写入失败[InsertMany]")
 }
 
 func (s *store) RemoveMany(uids []string) error {
-	_, err := s.collection.DeleteMany(context.Background(), bson.M{"uid": bson.M{"$in": uids}})
+	return s.removeMany(context.Background(), uids)
+}
+
+func (s *store) removeMany(ctx context.Context, uids []string) error {
+	_, err := s.collection.DeleteMany(ctx, bson.M{"uid": bson.M{"$in": uids}})
 	return errors.WithMessage(err, "Mongo数据批量删除失败[RemoveMany]")
 }

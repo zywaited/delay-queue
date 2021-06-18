@@ -98,10 +98,8 @@ func (rt RedisTask) Args(args *[]interface{}) {
 	}
 }
 
-var emptyPrimitiveObjectID = primitive.ObjectID{}
-
 type MongoTask struct {
-	Id primitive.ObjectID `json:"id,omitempty" bson:"_id" copy:"-"`
+	Id primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty" copy:"-"`
 
 	Score        int64  `json:"score" bson:"score"`
 	Token        string `json:"token" bson:"token"`
@@ -125,7 +123,7 @@ type MongoTask struct {
 
 func (t *Task) ConvertMongoTask(cp xcopy.XCopy, mt *MongoTask) {
 	_ = cp.CopySF(mt, t)
-	mt.Id = emptyPrimitiveObjectID
+	mt.Id = primitive.NilObjectID
 }
 
 func (mt *MongoTask) ConvertTask(cp xcopy.XCopy, t *Task) {

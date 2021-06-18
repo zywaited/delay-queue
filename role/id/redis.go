@@ -124,17 +124,27 @@ func (r *redisId) run() {
 		wr = r.wr
 		ws = nil
 		ir = nil
+		if (r.currentId > r.maxId) && nextCurrentId < nextMaxId {
+			// 这里主从复制延迟阔能会导致数据不一致
+			// 虽然数据库有唯一键，但这里也可以处理下
+			if nextMaxId >= r.currentId {
+				r.maxId = nextMaxId
+				if nextCurrentId > r.currentId {
+					r.currentId = nextCurrentId
+				}
+			}
+			if nextMaxId < r.currentId {
+				// 重新读
+				remote = 1
+			}
+			nextCurrentId = 0
+			nextMaxId = 0
+		}
 		switch remote {
 		case 1:
 			ws = r.ws
 		case 2:
 			ir = r.ir
-		}
-		if (r.currentId > r.maxId) && nextCurrentId < nextMaxId {
-			r.currentId = nextCurrentId
-			r.maxId = nextMaxId
-			nextCurrentId = 0
-			nextMaxId = 0
 		}
 		if r.currentId > r.maxId {
 			wr = nil

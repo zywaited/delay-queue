@@ -19,8 +19,12 @@ func NewStatusStore(client *mongo.Client, opts ...ConfigOption) *status {
 }
 
 func (s *status) Status(uid string, tt pb.TaskType) error {
+	return s.status(context.Background(), uid, tt)
+}
+
+func (s *status) status(ctx context.Context, uid string, tt pb.TaskType) error {
 	_, err := s.store.collection.UpdateOne(
-		context.Background(),
+		ctx,
 		bson.M{"uid": uid},
 		bson.M{"$set": bson.M{"type": int32(tt)}},
 	)
@@ -28,8 +32,12 @@ func (s *status) Status(uid string, tt pb.TaskType) error {
 }
 
 func (s *status) NextTime(uid string, nt *time.Time) error {
+	return s.nextTime(context.Background(), uid, nt)
+}
+
+func (s *status) nextTime(ctx context.Context, uid string, nt *time.Time) error {
 	_, err := s.store.collection.UpdateOne(
-		context.Background(),
+		ctx,
 		bson.M{"uid": uid},
 		bson.M{"$set": bson.M{"next_exec_time": nt.UnixNano()}},
 	)
@@ -37,8 +45,12 @@ func (s *status) NextTime(uid string, nt *time.Time) error {
 }
 
 func (s *status) IncrRetryTimes(uid string, num int) error {
+	return s.incrRetryTimes(context.Background(), uid, num)
+}
+
+func (s *status) incrRetryTimes(ctx context.Context, uid string, num int) error {
 	_, err := s.store.collection.UpdateOne(
-		context.Background(),
+		ctx,
 		bson.M{"uid": uid},
 		bson.M{"$inc": bson.M{"retry_times": num}},
 	)
@@ -46,8 +58,12 @@ func (s *status) IncrRetryTimes(uid string, num int) error {
 }
 
 func (s *status) IncrSendTimes(uid string, num int) error {
+	return s.incrSendTimes(context.Background(), uid, num)
+}
+
+func (s *status) incrSendTimes(ctx context.Context, uid string, num int) error {
 	_, err := s.store.collection.UpdateOne(
-		context.Background(),
+		ctx,
 		bson.M{"uid": uid},
 		bson.M{"$inc": bson.M{"times": num}},
 	)

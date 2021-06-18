@@ -74,7 +74,7 @@ func (so *storeOption) initMongoDataSource(dq *DelayQueue) error {
 		mongo.ConfigWithCollection((&model.MongoTask{}).Collection()),
 	}
 	dq.reloadStore = mongo.NewGenerateLoseStore(dq.c.CB.Mongo.Client, opts...)
-	if dq.c.CB.Mongo.Version < 4 {
+	if dq.c.CB.Mongo.Version < 4 || !dq.c.C.Mongo.Transaction {
 		// note: 全局都是修改操作，这里用bulk write也不会有问题
 		dq.store = mongo.NewLowerTransactionStore(dq.c.CB.Mongo.Client, opts...)
 		return nil
