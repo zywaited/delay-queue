@@ -117,6 +117,7 @@ type GpConfig struct {
 	IdleTime  int `toml:"idle_time"`
 	CheckNum  int `toml:"check_num"`
 	BlockTime int `toml:"block_time"`
+	SpanNum   int `toml:"span_num"`
 }
 
 type MongoConnectConfig struct {

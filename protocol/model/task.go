@@ -74,7 +74,7 @@ type DbTask struct {
 }
 
 func (t *DbTask) TableName() string {
-	return "med_delay_queue.task"
+	return "delay_queue.task"
 }
 
 type RedisTask map[string]interface{}

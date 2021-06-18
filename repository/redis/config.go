@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefaultStorePrefix = "med-delay-queue"
+	DefaultStorePrefix = "delay-queue"
 	DefaultStoreName   = "timing-task"
 )
 

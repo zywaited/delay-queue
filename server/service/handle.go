@@ -69,7 +69,7 @@ func (h *Handle) generateId(addReq *pb.AddReq) string {
 	}
 	mh := md5.New()
 	mh.Write(bs)
-	return hex.EncodeToString(mh.Sum([]byte("med-delay-queue")))
+	return hex.EncodeToString(mh.Sum([]byte("delay-queue")))
 }
 
 func (h *Handle) add(ctx context.Context, uid string, addReq *pb.AddReq) (err error) {

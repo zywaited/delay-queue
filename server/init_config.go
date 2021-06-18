@@ -41,6 +41,7 @@ func NewBaseLevelOption() *baseLevelOption {
 }
 
 func (blo *baseLevelOption) Run(dq *DelayQueue) error {
+	dq.base = time.Millisecond
 	switch dq.c.C.BaseLevel {
 	case "second":
 		dq.base = time.Second
@@ -72,6 +73,9 @@ func (po *poolOption) Run(dq *DelayQueue) error {
 	}
 	if dq.c.C.Gp != nil && dq.c.C.Gp.CheckNum > 0 {
 		opts = append(opts, limiter.PoolOptionsWithCheckNum(dq.c.C.Gp.CheckNum))
+	}
+	if dq.c.C.Gp != nil && dq.c.C.Gp.SpanNum > 0 {
+		opts = append(opts, limiter.PoolOptionsWithSpanNum(dq.c.C.Gp.SpanNum))
 	}
 	if dq.c.C.Gp != nil && dq.c.C.Gp.BlockTime != 0 {
 		multi := float64(dq.c.C.Gp.BlockTime)

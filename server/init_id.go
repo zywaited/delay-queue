@@ -20,9 +20,9 @@ const (
 )
 
 const (
-	timerIDEnvName  = "MED_DELAY_QUEUE_TIMER_NAME"
-	workerIDEnvName = "MED_DELAY_QUEUE_WORKER_NAME"
-	nodeIDEnvName   = "MED_DELAY_QUEUE_NODE_NAME"
+	timerIDEnvName  = "DELAY_QUEUE_TIMER_NAME"
+	workerIDEnvName = "DELAY_QUEUE_WORKER_NAME"
+	nodeIDEnvName   = "DELAY_QUEUE_NODE_NAME"
 )
 
 type currentIdOption struct {
