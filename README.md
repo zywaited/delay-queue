@@ -1,27 +1,35 @@
 # 延迟队列服务
 ## 设计要点
 ### Role
-1: Timer 
-	a: 任务投递到ReadyQueue之前需要先生成检测类型的任务到Bucket中（为了防止任务中断)
-	b: 接受任务并且负责扫描任务，把过期任务丢进执行队列中
-2: Worker
-	a: 仅从执行队列取出任务进行回调处理
-3: Timer&Worker
+* 1: Timer 
+	* a: 任务投递到ReadyQueue之前需要先生成检测类型的任务到Bucket中（为了防止任务中断)
+	* b: 接受任务并且负责扫描任务，把过期任务丢进执行队列中
+* 2: Worker
+	* a: 仅从执行队列取出任务进行回调处理
+* 3: Timer&Worker
 
 #### Timer
-1: redis zset
-2: 本地时间轮【如果是该类型，timer启动时会重载之前的数据进入内存】
+* 1: redis zset
+* 2: 本地时间轮【如果是该类型，timer启动时会重载之前的数据进入内存】
 
 #### Worker
 * 任务确认&任务回调
 * 重试次数
 
 #### Ready-Queue
-1: redis list
-2: memory chan 【role: timer&worker】
+* 1: redis list
+* 2: memory chan 【role: timer&worker】
 
 ## 配置
 参考: https://github.com/zywaited/delay-queue/blob/master/config/config.example.toml
+
+### 如果使用mongo存储
+```mongo
+# 创建uid唯一索引
+db.task.createIndex({"uid":1},{"unique":1})
+# 创建分数&重载索引
+db.task.createIndex({"token":1, "score":1},{"unique":1})
+```
 
 ## 访问
 参考: https://github.com/zywaited/delay-queue/blob/master/visit.md
