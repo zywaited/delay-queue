@@ -27,4 +27,4 @@ type Store interface {
 	Iter() StoreIterator
 }
 
-type NewTaskStore func() Store
+type NewTaskStore func(level, pos int) Store

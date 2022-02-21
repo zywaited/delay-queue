@@ -34,7 +34,7 @@ func NewServer(opts ...ServerConfigOption) *server {
 	}
 	return &server{
 		c:                 c,
-		store:             c.ns(),
+		store:             c.ns(-1, -1),
 		status:            role.StatusInitialized,
 		addTaskChannel:    make(chan task.Task, 1),
 		removeTaskChannel: make(chan task.Task, 1),

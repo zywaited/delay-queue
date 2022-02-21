@@ -100,7 +100,8 @@ func (fe *fileExec) updateFreeOffset(readWriter io.ReadWriteSeeker, offset int64
 		fe.memoryFreeOffsets = append(fe.memoryFreeOffsets, offset)
 		return
 	}
-	if fe.freeOffset.writeOffset == -1 {
+	// first offset on memory
+	if fe.freeOffset.writeOffset == -1 || fe.freeOffset.lastOffset == -1 {
 		fe.freeOffset.writeOffset = offset
 		fe.freeOffset.lastOffset = offset
 		return
@@ -142,6 +143,7 @@ func (fe *fileExec) fetchNextOffset(reader io.ReadWriteSeeker, offsetChannel cha
 		fe.nextOffsetReady <- struct{}{}
 		offsetChannel <- offset
 	}()
+	// new a free offset
 	if fe.freeOffset.writeOffset < 0 && len(fe.memoryFreeOffsets) == 0 {
 		offset, err = reader.Seek(taskReallySize*fe.writeNum, io.SeekStart)
 		if err == nil {
@@ -149,12 +151,14 @@ func (fe *fileExec) fetchNextOffset(reader io.ReadWriteSeeker, offsetChannel cha
 		}
 		return
 	}
+	// memory free offset
 	if len(fe.memoryFreeOffsets) > 0 {
 		offset = fe.memoryFreeOffsets[len(fe.memoryFreeOffsets)-1]
 		fe.memoryFreeOffsets = fe.memoryFreeOffsets[:len(fe.memoryFreeOffsets)-1]
 		return
 	}
 	offset = fe.freeOffset.writeOffset
+	// only one free offset
 	if fe.freeOffset.writeOffset == fe.freeOffset.lastOffset {
 		fe.freeOffset.writeOffset = -1
 		fe.freeOffset.lastOffset = -1
@@ -183,9 +187,6 @@ func (fe *fileExec) write(readWriter io.ReadWriteSeeker, ft *fileAddTask) {
 			err = errors.Errorf("[%d-%d]write task failed: %v", fe.level, ft.pos, rerr)
 		}
 		addResult.err = err
-		if len(writeOffsets) > 0 {
-			addResult.writeOffset = writeOffsets[0]
-		}
 		// note: not need sync
 		ft.finish <- addResult
 		if err != nil {
@@ -265,6 +266,10 @@ nextWriter:
 			}
 		}
 		if i > 0 {
+			// 是否是首次
+			if addResult.writeOffset == -1 {
+				addResult.writeOffset = offset
+			}
 			// 写入头部数据
 			err = fe._writeTaskHeader(readWriter, offset, currHeader)
 			if err != nil {
@@ -292,7 +297,8 @@ func (fe *fileExec) read(reader io.ReadWriteSeeker, ft *fileReceiveTask) {
 	var (
 		err        error
 		tasks      []task.Task
-		nextOffset = ft.offset
+		currOffset = ft.offset
+		nextOffset = currOffset
 	)
 	defer func() {
 		rerr := recover()
@@ -303,14 +309,14 @@ func (fe *fileExec) read(reader io.ReadWriteSeeker, ft *fileReceiveTask) {
 			err = errors.Errorf("[%d-%d]write task failed: %v", fe.level, ft.pos, rerr)
 		}
 		ft.finish <- fileReceiveResult{task: tasks, nextOffset: nextOffset, err: err}
-		if nextOffset != ft.offset {
-			nf := fileWriterNextOffset{file: reader, offset: ft.offset, finish: make(chan struct{}, 1)}
+		if nextOffset != currOffset {
+			nf := fileWriterNextOffset{file: reader, offset: currOffset, finish: make(chan struct{}, 1)}
 			fe.freeChannel <- nf
 			<-nf.finish
 		}
 		fe.readerReady <- reader
 	}()
-	header, err := fe._readTaskHeader(reader, ft.offset)
+	header, err := fe._readTaskHeader(reader, currOffset)
 	if err != nil {
 		err = errors.WithMessagef(err, "[%d-%d]read seek task-header failed", fe.level, ft.pos)
 		return
@@ -330,7 +336,7 @@ func (fe *fileExec) read(reader io.ReadWriteSeeker, ft *fileReceiveTask) {
 		l := int(bs[0])
 		if len(bs) < l+1 {
 			if fe.logger != nil {
-				fe.logger.Errorf("[%d-%d]read last task invalid: %d", fe.level, ft.pos, ft.offset)
+				fe.logger.Errorf("[%d-%d]read last task invalid: %d", fe.level, ft.pos, currOffset)
 			}
 			break
 		}
@@ -357,6 +363,10 @@ func (fe *fileExec) run() {
 		tc.Stop()
 		// todo: 通知其他服务
 	}()
+	err := fe._mkDir()
+	if err != nil {
+		panic(err)
+	}
 	var (
 		// task
 		ac = fe.addChannel
@@ -422,12 +432,16 @@ func (fe *fileExec) run() {
 		case oc := <-noc:
 			go fe.fetchNextOffset(oc.file, oc.finish)
 			noc = nil
+			foc = nil // fix: noc foc 存在竞争关系
 		case <-fe.nextOffsetReady:
 			noc = fe.nextOffsetChannel
+			foc = fe.freeChannel
 		case fc := <-foc:
 			go fe.updateFreeOffset(fc.file, fc.offset, fc.finish)
 			foc = nil
+			noc = nil
 		case <-fe.freeReady:
+			noc = fe.nextOffsetChannel
 			foc = fe.freeChannel
 		case <-fe.stopChannel:
 			if fe.logger != nil {
@@ -484,6 +498,18 @@ func (fe *fileExec) _fetchReader() (io.ReadWriteSeeker, error) {
 	}
 	fe.currReader++
 	return reader, nil
+}
+
+func (fe *fileExec) _mkDir() error {
+	dir := strings.TrimRight(fe.dir, "/")
+	_, err := os.Stat(dir)
+	if err == nil {
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return nil
+	}
+	return os.Mkdir(dir, 0766)
 }
 
 type fileExecOption func(fe *fileExec)

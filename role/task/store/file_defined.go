@@ -62,11 +62,10 @@ type fileReceiveResult struct {
 }
 
 type fileAddTask struct {
-	pos         int
-	writeOffset int64 // 中间流转的时候使用，初始化的时候应该默认-1
-	lastOffset  int64
-	task        []task.Task
-	finish      chan fileAddTaskResult
+	pos        int
+	lastOffset int64
+	task       []task.Task
+	finish     chan fileAddTaskResult
 }
 
 type fileReceiveTask struct {

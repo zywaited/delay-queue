@@ -20,7 +20,7 @@ func jobOptionWithCircle(circle int) jobOption {
 
 func jobOptionWithScale(scale time.Duration) jobOption {
 	return func(j *job) {
-		j.scale = scale
+		j.scaleBase = scale
 	}
 }
 

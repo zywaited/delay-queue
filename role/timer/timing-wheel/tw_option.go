@@ -1,6 +1,7 @@
 package timing_wheel
 
 import (
+	"math"
 	"time"
 
 	"github.com/zywaited/delay-queue/parser/system"
@@ -78,6 +79,10 @@ func optionWithScale(scale time.Duration) Option {
 	return func(c *config) {
 		c.scale = scale
 	}
+}
+
+func realScaleOption(configScale, configScaleLevel time.Duration) time.Duration {
+	return time.Duration(math.Ceil(float64(configScale) / float64(configScaleLevel)))
 }
 
 func NewConfig() *config {

@@ -75,8 +75,8 @@ func (t *task) init(opts ...ParamField) *task {
 	t.exec = now
 	switch t.param.time.TType {
 	case AbsoluteTime:
+		t.exec = t.param.time.TTime
 		if t.param.time.TTime > now {
-			t.exec = t.param.time.TTime
 			t.delay = t.exec - now
 		}
 	case RelativeTime:

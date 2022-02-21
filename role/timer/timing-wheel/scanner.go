@@ -13,15 +13,15 @@ const ServerName timer.ScannerType = "timing-wheel-server"
 
 type (
 	serverConfig struct {
-		factory task.PoolFactory
+		dt DecorateTask
 	}
 
 	ServerConfigOption func(*serverConfig)
 )
 
-func ServerConfigWithFactory(factory task.PoolFactory) ServerConfigOption {
+func ServerConfigWithTaskProto(dt DecorateTask) ServerConfigOption {
 	return func(sc *serverConfig) {
-		sc.factory = factory
+		sc.dt = dt
 	}
 }
 
@@ -45,12 +45,6 @@ func NewServer(c *serverConfig, opts ...Option) *server {
 		c:      c,
 		tw:     NewTimeWheel(opts...),
 		status: role.StatusInitialized,
-	}
-	if c == nil {
-		return s
-	}
-	if c.factory != nil {
-		s.p = c.factory.NewPool(newBindJobTask)
 	}
 	return s
 }
@@ -104,33 +98,16 @@ func (s *server) Add(t task.Task) error {
 	if atomic.LoadInt32(&s.status) != role.StatusRunning {
 		return errors.New("server not run")
 	}
-	s.tw.Add(s.decorateTask(t))
+	s.tw.Add(s.c.dt.Decorate(t))
 	return nil
 }
 
 func (s *server) Remove(t task.Task) error {
 	switch atomic.LoadInt32(&s.status) {
 	case role.StatusRunning, role.StatusGraceFulST:
-		s.tw.Remove(s.decorateTask(t))
+		s.tw.Remove(s.c.dt.Decorate(t))
 	}
 	return nil
-}
-
-func (s *server) decorateTask(t task.Task) Task {
-	j := (Task)(nil)
-	if s.p == nil {
-		// 池化不存在也可以执行
-		j = NewBindJob()
-	} else {
-		j = s.p.NewTask().(Task)
-		if pj, ok := j.(task.PoolTask); ok {
-			pj.Bind(s.p)
-		}
-	}
-	if jp, ok := j.(poolJob); ok {
-		jp.Extend(t)
-	}
-	return j
 }
 
 func (s *server) Running() bool {

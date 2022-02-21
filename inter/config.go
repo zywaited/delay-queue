@@ -77,13 +77,21 @@ type WorkerConfig struct {
 }
 
 type TimingWheelConfig struct {
-	MaxLevel          int    `toml:"max_level" valid:"required"` // 最大层级
-	SlotNum           int    `toml:"slot_num" valid:"required"`
-	ReloadGoNum       int    `toml:"reload_go_num" valid:"required"`
-	ReloadConfigScale int64  `toml:"reload_config_scale" valid:"required"`
-	ReloadPerNum      int    `toml:"reload_per_num" valid:"required"`
-	ReloadType        string `toml:"reload_type"`
-	MaxCheckTime      int64  `toml:"max_check_time"`
+	MaxLevel          int                    `toml:"max_level" valid:"required"` // 最大层级
+	SlotNum           int                    `toml:"slot_num" valid:"required"`
+	ReloadGoNum       int                    `toml:"reload_go_num" valid:"required"`
+	ReloadConfigScale int64                  `toml:"reload_config_scale" valid:"required"`
+	ReloadPerNum      int                    `toml:"reload_per_num" valid:"required"`
+	ReloadType        string                 `toml:"reload_type"`
+	MaxCheckTime      int64                  `toml:"max_check_time"`
+	FileStore         *TimingWheelFileConfig `toml:"file_store"`
+}
+
+type TimingWheelFileConfig struct {
+	Dir            string `toml:"dir"`
+	MaxMemoryNum   int    `toml:"max_memory_num"` // 最大内存存储数量
+	LevelMaxReader int    `toml:"level_max_reader"`
+	LevelMaxWriter int    `toml:"level_max_writer"`
 }
 
 type RedisConnectConfig struct {
