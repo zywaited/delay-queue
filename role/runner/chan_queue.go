@@ -7,15 +7,22 @@ import (
 )
 
 type memoryReadyQueue struct {
-	tc chan task.Task
+	factory task.Factory
+	tc      chan task.Task
 }
 
-func NewMemoryReadyQueue() *memoryReadyQueue {
-	return &memoryReadyQueue{tc: make(chan task.Task, 128)}
+func NewMemoryReadyQueue(factory task.Factory) *memoryReadyQueue {
+	return &memoryReadyQueue{factory: factory, tc: make(chan task.Task, 128)}
 }
 
 func (m *memoryReadyQueue) Push(t task.Task) error {
-	m.tc <- t
+	//m.tc <- t
+	// fix: 拷贝一份出来
+	m.tc <- m.factory(
+		task.ParamWithUid(t.Uid()),
+		task.ParamWithName(t.Name()),
+		task.ParamWithType(t.Type()),
+	)
 	return nil
 }
 

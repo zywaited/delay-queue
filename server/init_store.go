@@ -11,6 +11,7 @@ import (
 	"github.com/zywaited/delay-queue/repository/redis"
 	"github.com/zywaited/delay-queue/role"
 	"github.com/zywaited/delay-queue/role/runner"
+	"github.com/zywaited/delay-queue/role/task"
 	"github.com/zywaited/delay-queue/role/task/store"
 	"github.com/zywaited/delay-queue/role/timer/sorted"
 	tw "github.com/zywaited/delay-queue/role/timer/timing-wheel"
@@ -134,7 +135,7 @@ func (so *storeOption) initRedisReadyQueue(dq *DelayQueue) error {
 }
 
 func (so *storeOption) initMemoryReadyQueue(dq *DelayQueue) error {
-	dq.rq = runner.NewMemoryReadyQueue()
+	dq.rq = runner.NewMemoryReadyQueue(task.AcTaskPoolFactory(task.DefaultTaskPoolFactory))
 	return nil
 }
 

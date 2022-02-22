@@ -70,6 +70,10 @@ func (s *Sender) Send(addr *pb.CallbackInfo, req *pb.CallBackReq) error {
 	if err != nil {
 		return pkgerr.WithMessagef(err, "HTTP SEND failed: %s: %v", bs, err)
 	}
+	// fix: 防止句柄过多
+	if resp.Body != nil {
+		_ = resp.Body.Close()
+	}
 	if resp.StatusCode >= http.StatusBadRequest {
 		return fmt.Errorf("HTTP SEND failed: %d", resp.StatusCode)
 	}

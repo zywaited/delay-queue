@@ -261,6 +261,11 @@ func (tw *TimeWheel) removeTask(t Task) {
 		_ = tw.c.gp.Submit(context.Background(), func() {
 			tw.nextLevel.Remove(t)
 		})
+		return
+	}
+	// fix: 所有层级都不存在的话关闭即可
+	if ok {
+		pt.CloseResult(nil)
 	}
 }
 

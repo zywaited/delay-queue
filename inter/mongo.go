@@ -35,7 +35,9 @@ func ConfigDataWithMongo(cd *ConfigData) error {
 	// 设置超时时间
 	if mongoConfig.ConnectTimeout > 0 {
 		opts.SetConnectTimeout(time.Duration(mongoConfig.ConnectTimeout) * time.Second)
-		ctx, _ = context.WithTimeout(ctx, time.Duration(mongoConfig.ConnectTimeout)*time.Second)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(mongoConfig.ConnectTimeout)*time.Second)
+		defer cancel()
 	}
 	if mongoConfig.MaxConnIdleTime > 0 {
 		opts.SetMaxConnIdleTime(time.Duration(mongoConfig.MaxConnIdleTime) * time.Second)

@@ -76,12 +76,12 @@ func (gl *generateLoseStore) NextReady(st, et, limit int64) (int64, error) {
 	if len(score) < 2 {
 		return et, nil
 	}
-	max, err := redis.Int64(score[1], nil)
+	max, err := redis.Float64(score[1], nil)
 	if err != nil {
 		if err == redis.ErrNil {
 			return et, nil
 		}
 		return 0, errors.WithMessage(err, "redis查询当前分值的任务失败")
 	}
-	return max, nil
+	return int64(max), nil
 }
