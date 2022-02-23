@@ -102,6 +102,9 @@ func (r *runner) Run(tk task.Task) error {
 	mt, err := r.sd.Retrieve(tk.Uid())
 	if err != nil {
 		if !xerror.IsXCode(err, xcode.DBRecordNotFound) {
+			if r.logger != nil {
+				r.logger.Infof("runner retrieve task[%s] error: %s", tk.Uid(), err.Error())
+			}
 			r.retryDelay(tk)
 			return nil
 		}
@@ -113,14 +116,18 @@ func (r *runner) Run(tk task.Task) error {
 	// 删除脏数据
 	if pb.TaskType(mt.Type) == pb.TaskType_Ignore {
 		if r.logger != nil {
-			r.logger.Infof("runner run task[%s] error[type: %d]", tk.Uid(), mt.Type)
+			r.logger.Infof("runner run task[%s] finished error[type: %d]", tk.Uid(), mt.Type)
 		}
-		_ = r.sd.Remove(mt.Uid)
+		r.removeNotExistTask(tk)
 		return nil
 	}
 	if pb.TaskType(mt.Type) == pb.TaskType_TaskFinished || mt.Times > 0 {
 		if r.logger != nil {
 			r.logger.Infof("runner run task[%s] finished", tk.Uid())
+		}
+		// note: 检测是否发送了但状态不对
+		if pb.TaskType(mt.Type) != pb.TaskType_TaskFinished {
+			r.changeStatus(tk, pb.TaskType_TaskFinished)
 		}
 		return nil
 	}
@@ -135,6 +142,9 @@ func (r *runner) Run(tk task.Task) error {
 		r.incrTaskRetryTimes(tk)
 		r.retryCheck(mt)
 		return nil
+	}
+	if r.logger != nil {
+		r.logger.Infof("runner push task[%s] error: %s", tk.Uid(), err.Error())
 	}
 	r.retryDelay(tk)
 	return nil
@@ -197,21 +207,7 @@ func (r *runner) incrTaskRetryTimes(tk task.Task) {
 	if !ok {
 		return
 	}
-	var err error
-	fn := func(st role.DataStore) error {
-		us = st.(role.DataStoreUpdater)
-		err = us.IncrRetryTimes(tk.Uid(), 1)
-		if err != nil {
-			return err
-		}
-		return us.Status(tk.Uid(), pb.TaskType_TaskRetryDelay)
-	}
-	ts, ok := r.sd.(role.DataSourceTransaction)
-	if ok {
-		err = ts.Transaction(fn)
-	} else {
-		err = fn(r.sd)
-	}
+	err := us.IncrRetryTimes(tk.Uid(), 1)
 	if err == nil || r.logger == nil {
 		return
 	}

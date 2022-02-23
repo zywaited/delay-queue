@@ -140,6 +140,9 @@ func (f *fileIterator) Scan() task.Task {
 		f.fc.fileReadWriter.receiveChannel <- ft
 		fr := <-ft.finish
 		if fr.err != nil {
+			if f.fc.logger != nil {
+				f.fc.logger.Infof("[%d-%d]file store read failed: %s", f.fc.level, f.fc.pos, fr.err.Error())
+			}
 			// note: just sleep 1ms
 			time.Sleep(time.Millisecond)
 			// todo 报警机制【理论上除了负载和脏数据不会出现】
