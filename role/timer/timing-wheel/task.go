@@ -16,14 +16,15 @@ type Task interface {
 	task.Task
 
 	Pos() int
+	Circle() int
 	Ready() bool
-	Index(int, int)
 
 	/**
 	 * @param scale time.Duration 真实刻度
 	 * @param scaleLevel time.Duration 级别
 	 */
-	Scale(time.Duration, time.Duration)
+	scale(time.Duration, time.Duration)
+	index(int, int)
 }
 
 type job struct {
@@ -32,7 +33,7 @@ type job struct {
 
 	pos        int // 时间轮当前轮节点位置
 	circle     int // 圈数
-	scale      time.Duration
+	scaleBase  time.Duration
 	scaleLevel time.Duration
 }
 
@@ -56,7 +57,7 @@ func (j *job) Remaining() time.Duration {
 	return time.Duration(math.Ceil(float64(j.Task.Remaining()) / float64(j.scaleLevel)))
 }
 
-func (j *job) Index(pos, circle int) {
+func (j *job) index(pos, circle int) {
 	j.opts(jobOptionWithPos(pos), jobOptionWithCircle(circle))
 }
 
@@ -64,7 +65,11 @@ func (j *job) Pos() int {
 	return j.pos
 }
 
-func (j *job) Scale(scale, level time.Duration) {
+func (j *job) Circle() int {
+	return j.circle
+}
+
+func (j *job) scale(scale, level time.Duration) {
 	j.opts(jobOptionWithScale(scale), jobOptionWithScaleLevel(level))
 }
 
@@ -73,7 +78,7 @@ func (j *job) Ready() bool {
 		j.circle--
 	}
 	// 这里就直接以系统时间为准
-	return j.circle < 1 && j.Remaining() < j.scale
+	return j.circle < 1 && j.Remaining() < j.scaleBase
 }
 
 func (j *job) Release() {

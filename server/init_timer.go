@@ -31,14 +31,43 @@ func (to *timerOption) Run(dq *DelayQueue) error {
 	sr := (timer.Scanner)(nil)
 	switch dq.c.C.Timer.St {
 	case string(tw.ServerName):
+		ts := store.Handler(store.DefaultStoreName)
+		configScale := time.Duration(dq.c.C.ConfigScale) * dq.base
+		scaleLevel := time.Duration(dq.c.C.Timer.ConfigScaleLevel) * dq.base
+		tp := tw.NewTaskProto(
+			tw.TaskProtoOptionWithConfigScale(configScale),
+			tw.TaskProtoOptionWithScaleLevel(scaleLevel),
+			tw.TaskProtoOptionWithRunnerFactor(func() task.Runner {
+				// note: 懒加载
+				// 1: 初始化未完成: NewRunnerOption
+				// 2: 不一定会使用: file store
+				return runner.AcRunner(runner.DefaultRunnerName)
+			}),
+			tw.TaskProtoOptionWithTaskFactory(task.AcTaskPoolFactory(task.DefaultTaskPoolFactory)),
+			tw.TaskProtoOptionWithPoolFactory(task.AcPoolFactory(task.DefaultTaskPoolFactory)),
+		)
+		if dq.c.C.Timer.TimingWheel.FileStore != nil {
+			// use file store
+			ts = store.NewFilePool(
+				&store.FileConfig{
+					Dir:            dq.c.C.Timer.TimingWheel.FileStore.Dir,
+					MaxMemoryNum:   dq.c.C.Timer.TimingWheel.FileStore.MaxMemoryNum,
+					LevelMaxReader: dq.c.C.Timer.TimingWheel.FileStore.LevelMaxReader,
+					LevelMaxWriter: dq.c.C.Timer.TimingWheel.FileStore.LevelMaxWriter,
+				},
+				store.FilePoolOptionWithLogger(dq.c.CB.Logger),
+				store.FilePoolOptionWithTaskProto(tp),
+			).NewTaskStore
+			store.RegisterHandler(store.FileStoreName, ts)
+		}
 		sr = tw.NewServer(
-			tw.NewServerConfig(tw.ServerConfigWithFactory(task.AcPoolFactory(task.DefaultTaskPoolFactory))),
+			tw.NewServerConfig(tw.ServerConfigWithTaskProto(tp)),
 			tw.OptionWithSlotNum(dq.c.C.Timer.TimingWheel.SlotNum),
 			tw.OptionWithLogger(dq.c.CB.Logger),
 			tw.OptionWithMaxLevel(dq.c.C.Timer.TimingWheel.MaxLevel),
-			tw.OptionWithConfigScale(time.Duration(dq.c.C.ConfigScale)*dq.base),
-			tw.OptionWithScaleLevel(time.Duration(dq.c.C.Timer.ConfigScaleLevel)*dq.base),
-			tw.OptionWithNewTaskStore(store.Handler(store.DefaultStoreName)),
+			tw.OptionWithConfigScale(configScale),
+			tw.OptionWithScaleLevel(scaleLevel),
+			tw.OptionWithNewTaskStore(ts),
 			tw.OptionWithGP(dq.gp),
 		)
 	case string(sorted.ServerName):

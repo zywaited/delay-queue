@@ -90,6 +90,17 @@ role = 3
         # 等待多少时间才重载[秒], 这里是为了防止竞争锁导致的数据未写入
         max_check_time = 3
 
+        # 文件存储
+        [timer.timing_wheel.file_store]
+            # 文件保存地址
+            dir = "/tmp/delay-queue/data"
+            # 内存最大保存数量
+            max_memory_num = 1000
+            # 每一层最大文件读
+            level_max_reader = 300
+            # 每一层最大文件写[最好与slot_num保持一致]
+            level_max_writer = 60
+
 # 回调器: 当前role&2>0时生效
 [worker]
     # 回调重试次数
@@ -100,7 +111,7 @@ role = 3
 # 日志
 [log]
     # 路径
-    dir = "/var/log/medlinker/delay-queue"
+    dir = "/tmp/delay-queue/log"
     # 打印级别
     level = "info"
     # 类别

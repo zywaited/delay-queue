@@ -12,7 +12,7 @@ import (
 	"github.com/zywaited/delay-queue/role/task"
 )
 
-// TimingWheel 时间轮
+// TimeWheel 时间轮
 // interval暂不考虑层级过高导致的溢出(限制最大层级)
 type TimeWheel struct {
 	c                 *config
@@ -37,7 +37,7 @@ func NewTimeWheel(opts ...Option) *TimeWheel {
 	for _, opt := range opts {
 		opt(c)
 	}
-	optionWithScale(time.Duration(math.Ceil(float64(c.configScale) / float64(c.configScaleLevel))))(c)
+	optionWithScale(realScaleOption(c.configScale, c.configScaleLevel))(c)
 	return newTimeWheelWithConfig(c)
 }
 
@@ -75,7 +75,7 @@ func (tw *TimeWheel) setBaseLevel(base *TimeWheel) {
 
 func (tw *TimeWheel) initSlots() {
 	for i := 0; i < tw.c.slotNum; i++ {
-		tw.slots[i] = tw.c.newTaskStore()
+		tw.slots[i] = tw.c.newTaskStore(tw.c.currentLevel, i)
 	}
 }
 
@@ -198,7 +198,7 @@ func (tw *TimeWheel) addTask(t Task) {
 		})
 		return
 	}
-	t.Index(pos, circle)
+	t.index(pos, circle)
 	if err = tw.slots[pos].Add(t); err != nil {
 		if tw.c.logger != nil {
 			tw.c.logger.Infof(
@@ -208,7 +208,8 @@ func (tw *TimeWheel) addTask(t Task) {
 		}
 		return
 	}
-	tw.taskIndex[t.Uid()] = pos
+	// todo 时间轮不再删除数据
+	//tw.taskIndex[t.Uid()] = pos
 	if tw.c.logger != nil {
 		tw.c.logger.Infof(
 			"task[%s]: %s add to timing-wheel, level: %d, pos: [%d-%d], circle: %d",
@@ -260,6 +261,11 @@ func (tw *TimeWheel) removeTask(t Task) {
 		_ = tw.c.gp.Submit(context.Background(), func() {
 			tw.nextLevel.Remove(t)
 		})
+		return
+	}
+	// fix: 所有层级都不存在的话关闭即可
+	if ok {
+		pt.CloseResult(nil)
 	}
 }
 
@@ -303,7 +309,7 @@ func (tw *TimeWheel) tick() {
 		tw.c.logger.Infof("timing-wheel[%d][%d]: run task", tw.c.currentLevel, tw.currentPos)
 	}
 	// 这里为了性能分开处理
-	tw.slots[tw.currentPos] = tw.c.newTaskStore()
+	tw.slots[tw.currentPos] = tw.c.newTaskStore(tw.c.currentLevel, tw.currentPos)
 	_ = tw.c.gp.Submit(context.Background(), func() {
 		tw.scanTasks(store)
 	})
@@ -373,9 +379,10 @@ func (tw *TimeWheel) Add(t Task) {
 		return
 	}
 	// 最小刻度&配置级别, 用于判断任务是否到期(只有第一层才处理)
-	if tw == tw.baseLevel {
-		t.Scale(tw.scale, tw.c.configScaleLevel)
-	}
+	// todo 由上层处理
+	//if tw == tw.baseLevel {
+	//	t.scale(tw.scale, tw.c.configScaleLevel)
+	//}
 	if t.Ready() {
 		if tw.c.logger != nil {
 			tw.c.logger.Infof("timing-wheel[%d], task[%s] add ready", tw.c.currentLevel, t.Uid())

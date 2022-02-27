@@ -14,7 +14,7 @@ type (
 	}
 
 	pool interface {
-		NewTaskStore() task.Store
+		NewTaskStore(level, pos int) task.Store
 		ReleaseTaskStore(task.Store)
 
 		newTaskStoreIter() task.StoreIterator
@@ -41,7 +41,7 @@ func NewTaskPoolStore(sn newTaskStore, in newTaskStoreIter) *TaskPoolStore {
 	return tpl
 }
 
-func (tpl *TaskPoolStore) NewTaskStore() task.Store {
+func (tpl *TaskPoolStore) NewTaskStore(_, _ int) task.Store {
 	tl := tpl.storePool.Get().(taskStore)
 	tl.reset(tpl)
 	return tl
