@@ -206,6 +206,7 @@ func (fp *filePool) NewTaskStore(level, pos int) task.Store {
 	fp.locker.RUnlock()
 	if !exist {
 		fp.locker.Lock()
+		fe, exist = fp.fm[level]
 		if !exist {
 			fe = newFileExec(
 				fileExecOptionWithDir(fp.c.Dir, level),
