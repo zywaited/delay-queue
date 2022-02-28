@@ -192,7 +192,7 @@ func (tw *TimeWheel) addTask(t Task) {
 	// 可在当前时间轮中
 	pos, circle := tw.getPosAndCircle(tt)
 	// 异步调度导致的时间误差
-	if pos == tw.currentPos {
+	if pos <= tw.currentPos {
 		_ = tw.c.gp.Submit(context.Background(), func() {
 			tw.baseLevel.Add(t)
 		})
